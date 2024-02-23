@@ -94,7 +94,7 @@ class WarpCore(ABC):
 
     # return a dict with all models that are going to be used in the training
     @abstractmethod
-    def setup_models(self, extras: Extras) -> Models:
+    def setup_models(self, extras: Extras, shared: dict=None) -> Models:
         raise NotImplementedError("This method needs to be overriden")
 
     # return a dict with all optimizers that are going to be used in the training

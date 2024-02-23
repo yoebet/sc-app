@@ -1,0 +1,162 @@
+
+### root
+GET {{base}}//
+Accept: application/json
+
+
+### check_mem_all
+
+GET {{base}}/check_mem_all/available?unit=G
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+
+### check_mem
+
+GET {{base}}/check_mem/0?unit=G
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+
+### txt2img
+
+POST {{base}}/task/txt2img
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "seed": 2796926360,
+    "steps": 20,
+    "width": 768,
+    "height": 1152,
+    "prompt": " youthful girl, sweet and gentle-looking, with hopeful, round eyes. Action: Diving downward with arms outstretched. Background: A fantastic and beautiful sky with clouds. Requirement: Extremely high image quality, with a soft glow. . anime style, key visual, vibrant, studio anime,  highly detailed",
+    "sub_dir": "test",
+    "task_id": "222",
+    "batch_size": 4,
+    "guidance_scale": 4,
+    "negative_prompt": "photo, deformed, black and white, realism, disfigured, low contrast"
+  },
+  "launch": {
+    "device_index": 3
+  }
+}
+
+
+### img2img
+
+POST {{base}}/task/img2img
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "task_id": "44",
+    "sub_dir": "test",
+    "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
+    "prompt": "a cup of tea",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 880,
+    "height": 1024,
+    "batch_size": 2,
+    "steps": 20,
+    "guidance_scale": 4.0,
+    "steps2": 10,
+    "guidance_scale2": 1.1
+  },
+  "launch": {
+    "device_index": 2
+  }
+}
+
+
+### img_variate
+
+POST {{base}}/task/img_variate
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/a36ryJ5UhCVuvVEM/1709093025-0.png",
+    "prompt": "1girl, valley",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 1,
+    "steps": 20,
+    "guidance_scale": 4.0,
+    "steps2": 10,
+    "guidance_scale2": 1.1
+  },
+  "launch": {
+    "device_index": 4
+  }
+}
+
+
+### inpaint
+
+POST {{base}}/task/img_gen
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "task_type": "inpaint",
+    "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/KzObvl9DxBhm0IDb/1709099669-1.png",
+    "prompt": "a green pole on the side of a dirt road, a sign on top of it, with red Word \"danger\"",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 1,
+    "steps": 20,
+    "guidance_scale": 4.0,
+    "steps2": 10,
+    "guidance_scale2": 1.1
+  },
+  "launch": {
+    "device_index": 4
+  }
+}
+
+
+### outpaint
+
+POST {{base}}/task/img_gen
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "task_type": "outpaint",
+    "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/KzObvl9DxBhm0IDb/1709099669-1.png",
+    "prompt": "a green pole on the side of a dirt road, a sign on top of it, with red Word \"blue\"",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 1,
+    "outpaint_ext": [
+      33
+    ],
+    "steps": 20,
+    "guidance_scale": 4.0,
+    "steps2": 10,
+    "guidance_scale2": 1.1
+  },
+  "launch": {
+    "device_index": 4
+  }
+}
+

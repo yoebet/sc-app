@@ -158,55 +158,66 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         return conditions
 
-    def setup_models(self, extras: Extras) -> Models:
+    def setup_models(self, extras: Extras, shared: dict = None) -> Models:
         dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
 
-        # EfficientNet encoder
-        effnet = EfficientNetEncoder().to(self.device)
-        effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
-        effnet.load_state_dict(effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
-        effnet.eval().requires_grad_(False)
-        del effnet_checkpoint
+        if shared is not None:
+            effnet = shared.get('effnet', None)
+            previewer = shared.get('previewer', None)
+            generator = shared.get('generator', None)
+            tokenizer = shared.get('tokenizer', None)
+            text_model = shared.get('text_model', None)
+            image_model = shared.get('image_model', None)
+            generator_ema = shared.get('generator_ema', None)
+        else:
+            # EfficientNet encoder
+            effnet = EfficientNetEncoder().to(self.device)
+            effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
+            effnet.load_state_dict(effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
+            effnet.eval().requires_grad_(False)
+            del effnet_checkpoint
 
-        # Previewer
-        previewer = Previewer().to(self.device)
-        previewer_checkpoint = load_or_fail(self.config.previewer_checkpoint_path)
-        previewer.load_state_dict(previewer_checkpoint if 'state_dict' not in previewer_checkpoint else previewer_checkpoint['state_dict'])
-        previewer.eval().requires_grad_(False)
-        del previewer_checkpoint
+            # Previewer
+            previewer = Previewer().to(self.device)
+            previewer_checkpoint = load_or_fail(self.config.previewer_checkpoint_path)
+            previewer.load_state_dict(previewer_checkpoint if 'state_dict' not in previewer_checkpoint else previewer_checkpoint['state_dict'])
+            previewer.eval().requires_grad_(False)
+            del previewer_checkpoint
 
-        @contextmanager
-        def dummy_context():
-            yield None
+            @contextmanager
+            def dummy_context():
+                yield None
 
-        loading_context = dummy_context if self.config.training else init_empty_weights
+            loading_context = dummy_context if self.config.training else init_empty_weights
 
-        with loading_context():
-            # Diffusion models
-            if self.config.model_version == '3.6B':
-                generator = StageC()
-            elif self.config.model_version == '1B':
-                generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-            else:
-                raise ValueError(f"Unknown model version {self.config.model_version}")
-                
-        if self.config.generator_checkpoint_path is not None:
-            if loading_context is dummy_context:
-                generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
-            else:
-                for param_name, param in load_or_fail(self.config.generator_checkpoint_path).items():
-                    set_module_tensor_to_device(generator, param_name, "cpu", value=param)
-        generator = generator.to(dtype).to(self.device)
-        generator = self.load_model(generator, 'generator')
+            with loading_context():
+                # Diffusion models
+                if self.config.model_version == '3.6B':
+                    generator = StageC()
+                elif self.config.model_version == '1B':
+                    generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+                else:
+                    raise ValueError(f"Unknown model version {self.config.model_version}")
 
-        # if self.config.use_fsdp:
-        #     fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
-        #     generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
+            if self.config.generator_checkpoint_path is not None:
+                if loading_context is dummy_context:
+                    generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+                else:
+                    for param_name, param in load_or_fail(self.config.generator_checkpoint_path).items():
+                        set_module_tensor_to_device(generator, param_name, "cpu", value=param)
+            generator = generator.to(dtype).to(self.device)
+            generator = self.load_model(generator, 'generator')
 
-        # CLIP encoders
-        tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
-        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(dtype).to(self.device)
+            # if self.config.use_fsdp:
+            #     fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
+            #     generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
+
+            # CLIP encoders
+            tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
+            text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
+            image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(dtype).to(self.device)
+
+            generator_ema = None
 
         # ControlNet
         controlnet = ControlNet(
@@ -229,7 +240,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return self.Models(
             effnet=effnet, previewer=previewer,
-            generator=generator, generator_ema=None,
+            generator=generator, generator_ema=generator_ema,
             controlnet=controlnet,
             tokenizer=tokenizer, text_model=text_model, image_model=image_model
         )
