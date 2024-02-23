@@ -1,0 +1,2 @@
+
+CUDA_VISIBLE_DEVICES=6 PYTHONPATH=./ pc python3 gradio_app/app.py

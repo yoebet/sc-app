@@ -28,9 +28,10 @@ def randomize_seed_fn(seed: int, randomize_seed: bool) -> int:
         seed = random.randint(0, MAX_SEED)
     return seed
 
-def generate_prior(prompt, negative_prompt, generator, width, height, num_inference_steps, guidance_scale, num_images_per_prompt):
+def generate_prior(prompt, negative_prompt, image, generator, width, height, num_inference_steps, guidance_scale, num_images_per_prompt):
     prior_output = prior(
         prompt=prompt,
+        image=image,
         height=height,
         width=width,
         negative_prompt=negative_prompt,
@@ -62,6 +63,7 @@ def generate_decoder(prior_embeds, prompt, negative_prompt, generator, num_infer
 def generate(
     prompt: str,
     negative_prompt: str = "",
+    image = None,
     seed: int = 0,
     randomize_seed: bool = True,
     width: int = 1024,
@@ -79,6 +81,7 @@ def generate(
     prior_embeds = generate_prior(
         prompt=prompt,
         negative_prompt=negative_prompt,
+        image=image,
         generator=generator,
         width=width,
         height=height,
@@ -120,6 +123,10 @@ with gr.Blocks(css="gradio_app/style.css") as demo:
                 label="Negative prompt",
                 max_lines=1,
                 placeholder="Enter a Negative Prompt",
+            )
+            image = gr.Image(
+                type="pil",
+                label="Input Image",
             )
 
             seed = gr.Slider(
@@ -193,6 +200,7 @@ with gr.Blocks(css="gradio_app/style.css") as demo:
     inputs = [
             prompt,
             negative_prompt,
+            image,
             seed,
             randomize_seed,
             width,
@@ -219,4 +227,5 @@ with gr.Blocks(css="gradio_app/style.css") as demo:
         outputs=result,
     )
 
-demo.queue(20).launch()
+# demo.queue(20).launch()
+demo.queue(10).launch(server_name='0.0.0.0', server_port=8008)
