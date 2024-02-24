@@ -57,7 +57,7 @@ def check_device_mem(device_index):
     })
 
 
-def build_txt2img_params(params):
+def _build_txt2img_params(params):
     return {
         'prompt': params.get('prompt', None),
         'negative_prompt': params.get('negative_prompt', None),
@@ -73,8 +73,7 @@ def build_txt2img_params(params):
     }
 
 
-@app.route('/task/txt2img', methods=('POST',))
-def launch_task():
+def _gen_images(task_type):
     req = request.get_json()
     logger.info(pformat(req))
     params = req.get('params')
@@ -82,10 +81,13 @@ def launch_task():
     if launch_params is None:
         launch_params = {}
 
-    task_params = build_txt2img_params(params)
+    task_params = _build_txt2img_params(params)
+    if task_type == 'img2img' or task_type == 'img_variate':
+        task_params['image'] = params.get('image')
 
     try:
-        result = task_executor.txt2img(task_params, launch_params)
+        fn = getattr(task_executor, task_type)
+        result = fn(task_params, launch_params)
     except Exception as e:
         logger.error(e)
         return jsonify({
@@ -94,30 +96,21 @@ def launch_task():
         })
 
     return jsonify(result)
+
+
+@app.route('/task/txt2img', methods=('POST',))
+def txt2img():
+    return _gen_images('txt2img')
 
 
 @app.route('/task/img2img', methods=('POST',))
-def launch_task():
-    req = request.get_json()
-    logger.info(pformat(req))
-    params = req.get('params')
-    launch_params = req.get('launch')
-    if launch_params is None:
-        launch_params = {}
+def img2img():
+    return _gen_images('img2img')
 
-    task_params = build_txt2img_params(params)
-    task_params['image'] = params.get('image')
 
-    try:
-        result = task_executor.txt2img(task_params, launch_params)
-    except Exception as e:
-        logger.error(e)
-        return jsonify({
-            'success': False,
-            'error_message': f"[launch] {type(e)}: {e}"
-        })
-
-    return jsonify(result)
+@app.route('/task/img_variate', methods=('POST',))
+def img_variate():
+    return _gen_images('img_variate')
 
 
 def get():

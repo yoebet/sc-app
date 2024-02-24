@@ -72,3 +72,30 @@ Authorization: {{auth}}
   }
 }
 
+
+### img_variate
+
+GET {{base}}/task/img_variate
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "params": {
+    "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
+    "prompt": "a cup of coffee",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 2,
+    "prior_num_inference_steps": 20,
+    "prior_guidance_scale": 4.0,
+    "decoder_num_inference_steps": 10,
+    "decoder_guidance_scale": 1.1
+  },
+  "launch": {
+    "device_index": 6
+  }
+}
+
