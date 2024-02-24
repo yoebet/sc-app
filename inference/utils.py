@@ -1,3 +1,5 @@
+import base64
+
 import PIL
 import torch
 import requests
@@ -19,9 +21,11 @@ def resize_image(image, size=768):
     return resized_image
 
 
-def downscale_images(images, factor=3/4):
-    scaled_height, scaled_width = int(((images.size(-2)*factor)//32)*32), int(((images.size(-1)*factor)//32)*32)
-    scaled_image = torchvision.transforms.functional.resize(images, (scaled_height, scaled_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+def downscale_images(images, factor=3 / 4):
+    scaled_height, scaled_width = int(((images.size(-2) * factor) // 32) * 32), int(
+        ((images.size(-1) * factor) // 32) * 32)
+    scaled_image = torchvision.transforms.functional.resize(images, (scaled_height, scaled_width),
+                                                            interpolation=torchvision.transforms.InterpolationMode.NEAREST)
     return scaled_image
 
 
@@ -30,7 +34,7 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
         images = images.repeat(1, 3, 1, 1)
     elif images.size(1) > 3:
         images = images[:, :3]
-    
+
     if rows is None:
         rows = 1
     if cols is None:
@@ -42,7 +46,7 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
     for i, img in enumerate(images):
         img = torchvision.transforms.functional.to_pil_image(img.clamp(0, 1))
         grid.paste(img, box=(i % cols * w, i // cols * h))
-    
+
     bio = BytesIO()
     grid.save(bio, format='png')
     display(Image(bio.getvalue(), format='png'))
@@ -51,14 +55,34 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
         return grid
 
 
+def to_base64_images(images):
+    if images.size(1) == 1:
+        images = images.repeat(1, 3, 1, 1)
+    elif images.size(1) > 3:
+        images = images[:, :3]
+
+    pil_imgs = [torchvision.transforms.functional.to_pil_image(img.clamp(0, 1)) for img in images]
+    return pils_to_base64(pil_imgs)
+
+
+def pils_to_base64(images):
+    encoded_imgs = []
+    for pil in images:
+        bio = BytesIO()
+        pil.save(bio, format='png')
+        b64 = base64.b64encode(bio.getvalue()).decode('utf-8')
+        encoded_imgs.append(f'data:image/png;base64,{b64}')
+    return encoded_imgs
+
+
 def calculate_latent_sizes(height=1024, width=1024, batch_size=4, compression_factor_b=42.67, compression_factor_a=4.0):
     resolution_multiple = 42.67
     latent_height = ceil(height / compression_factor_b)
     latent_width = ceil(width / compression_factor_b)
     stage_c_latent_shape = (batch_size, 16, latent_height, latent_width)
-    
+
     latent_height = ceil(height / compression_factor_a)
     latent_width = ceil(width / compression_factor_a)
     stage_b_latent_shape = (batch_size, 4, latent_height, latent_width)
-    
+
     return stage_c_latent_shape, stage_b_latent_shape

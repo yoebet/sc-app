@@ -18,3 +18,17 @@ onnx2torch>=1.5.13
 warmup-scheduler @ git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git
 torchtools @ git+https://github.com/pabloppp/pytorch-tools
 # -e git+https://github.com/kashif/diffusers@a3dc21385b7386beb3dab3a9845962ede6765887#egg=diffusers
+
+flask
+python-dotenv
+shortuuid
+gunicorn
+
+requests
+ipython
+jupyter
+jupyterlab
+urllib3
+PyYAML
+Pillow
+psutil

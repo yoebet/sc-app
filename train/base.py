@@ -24,6 +24,7 @@ import webdataset as wds
 from webdataset.handlers import warn_and_continue
 
 import transformers
+
 transformers.utils.logging.set_verbosity_error()
 
 
@@ -138,6 +139,7 @@ class DataCore(WarpCore):
             return_fields = ['clip_text', 'clip_text_pooled', 'clip_img']
 
         captions = batch.get('captions', None)
+        # negative
         images = batch.get('images', None)
         batch_size = len(captions)
 
@@ -147,6 +149,7 @@ class DataCore(WarpCore):
             if is_eval:
                 if is_unconditional:
                     captions_unpooled = ["" for _ in range(batch_size)]
+                    #     ...
                 else:
                     captions_unpooled = captions
             else:
@@ -172,7 +175,8 @@ class DataCore(WarpCore):
                 else:
                     rand_idx = np.random.rand(batch_size) > 0.9
                     if any(rand_idx):
-                        image_embeddings[rand_idx] = models.image_model(extras.clip_preprocess(images[rand_idx])).image_embeds
+                        image_embeddings[rand_idx] = models.image_model(
+                            extras.clip_preprocess(images[rand_idx])).image_embeds
             image_embeddings = image_embeddings.unsqueeze(1)
         return {
             'clip_text': text_embeddings,
@@ -334,8 +338,10 @@ class TrainingCore(DataCore, WarpCore):
         with torch.no_grad():
             batch = next(data.iterator)
 
-            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False, eval_image_embeds=False)
-            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True, eval_image_embeds=False)
+            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
+                                             eval_image_embeds=False)
+            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
+                                               eval_image_embeds=False)
 
             latents = self.encode_latents(batch, models, extras)
             noised, _, _, logSNR, noise_cond, _ = extras.gdf.diffuse(latents, shift=1, loss_shift=1)
@@ -381,7 +387,8 @@ class TrainingCore(DataCore, WarpCore):
                     torch.cat([i for i in sampled_images_ema.cpu()], dim=-1),
                 ], dim=-2)
 
-                torchvision.utils.save_image(collage_img, f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
+                torchvision.utils.save_image(collage_img,
+                                             f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
                 torchvision.utils.save_image(collage_img, f'{self.config.experiment_id}_latest_output.jpg')
 
                 captions = batch['captions']

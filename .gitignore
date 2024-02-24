@@ -12,3 +12,4 @@ jobs/*.sh
 *_test.yaml
 .idea/
 .tasks/
+.logs/
