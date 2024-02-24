@@ -1,7 +1,10 @@
 import os
+import io
 import shutil
+import base64
 import ipaddress
 import requests
+from PIL import Image
 from urllib.parse import urlparse
 import torch
 
@@ -75,3 +78,13 @@ def download(resource_url, target_dir, filename, default_ext):
         with open(full_path, 'wb') as f:
             shutil.copyfileobj(res.raw, f)
     return full_path
+
+
+def decode_to_pil_images(encoded_images):
+    images = []
+    for idx, encoded in enumerate(encoded_images):
+        if encoded.startswith("data:image/"):
+            encoded = encoded.split(";")[1].split(",")[1]
+        image = Image.open(io.BytesIO(base64.b64decode(encoded)))
+        images.append(image)
+    return images

@@ -45,7 +45,7 @@ class RunnerBase:
         ...
 
     def txt2img(self, **params):
-        if self.queue_lock.acquire(blocking=True) >= MAX_WAITING:
+        if self.queue_lock.pending_count >= MAX_WAITING:
             return {
                 'success': False,
                 'error_message': f"busy"
