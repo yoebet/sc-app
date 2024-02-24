@@ -22,7 +22,7 @@ Authorization: {{auth}}
 
 ### txt2img
 
-GET {{base}}/task/txt2img
+POST /task/txt2img
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
@@ -48,7 +48,7 @@ Authorization: {{auth}}
 
 ### img2img
 
-GET {{base}}/task/img2img
+POST {{base}}/task/img2img
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
@@ -75,7 +75,7 @@ Authorization: {{auth}}
 
 ### img_variate
 
-GET {{base}}/task/img_variate
+POST {{base}}/task/img_variate
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
