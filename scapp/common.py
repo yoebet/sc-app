@@ -80,11 +80,15 @@ def download(resource_url, target_dir, filename, default_ext):
     return full_path
 
 
+def decode_to_pil_image(encoded):
+    if encoded.startswith("data:image/"):
+        encoded = encoded.split(";")[1].split(",")[1]
+    return Image.open(io.BytesIO(base64.b64decode(encoded)))
+
+
 def decode_to_pil_images(encoded_images):
     images = []
     for idx, encoded in enumerate(encoded_images):
-        if encoded.startswith("data:image/"):
-            encoded = encoded.split(";")[1].split(",")[1]
-        image = Image.open(io.BytesIO(base64.b64decode(encoded)))
+        image = decode_to_pil_image(encoded)
         images.append(image)
     return images

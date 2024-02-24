@@ -10,10 +10,6 @@ from train import WurstCoreC, WurstCoreB
 device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
 print(device)
 
-# %env http_proxy=http://54.177.243.94:8118
-# %env https_proxy=http://54.177.243.94:8118
-# %env HF_HUB_OFFLINE=1
-
 # SETUP STAGE C
 config_file = 'configs/inference/stage_c_3b.yaml'
 with open(config_file, "r", encoding="utf-8") as file:
@@ -71,13 +67,16 @@ extras_b.sampling_configs['t_start'] = 1.0
 
 # PREPARE CONDITIONS
 batch = {'captions': [caption] * batch_size}
-conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False, eval_image_embeds=False)
-unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True, eval_image_embeds=False)
-conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
-unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
 
 with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
     # torch.manual_seed(42)
+
+    conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
+                                     eval_image_embeds=False)
+    unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
+                                       eval_image_embeds=False)
+    conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
+    unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
 
     sampling_c = extras.gdf.sample(
         models.generator, conditions, stage_c_latent_shape,

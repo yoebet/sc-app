@@ -3,7 +3,8 @@ import random
 import gc
 from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
 from .runner_base import RunnerBase, MAX_SEED
-from inference.utils import pils_to_base64
+from inference.utils import pils_to_base64, download_image
+from .common import decode_to_pil_image
 
 
 class RunnerDf(RunnerBase):
@@ -19,10 +20,11 @@ class RunnerDf(RunnerBase):
         self.prior = prior.to(self.device)
         self.decoder = decoder.to(self.device)
 
-    def generate_prior(self, prompt, negative_prompt,
-                       generator, width, height, num_inference_steps, guidance_scale, num_images_per_prompt):
+    def _generate_prior(self, prompt, negative_prompt, image,
+                        generator, width, height, num_inference_steps, guidance_scale, num_images_per_prompt):
         prior_output = self.prior(
             prompt=prompt,
+            image=image,
             height=height,
             width=width,
             negative_prompt=negative_prompt,
@@ -35,7 +37,7 @@ class RunnerDf(RunnerBase):
         gc.collect()
         return prior_output.image_embeddings
 
-    def generate_decoder(self, prior_embeds, prompt, negative_prompt, generator, num_inference_steps, guidance_scale):
+    def _generate_decoder(self, prior_embeds, prompt, negative_prompt, generator, num_inference_steps, guidance_scale):
         decoder_output = self.decoder(
             image_embeddings=prior_embeds.to(device=self.device, dtype=self.decoder.dtype),
             prompt=prompt,
@@ -51,10 +53,15 @@ class RunnerDf(RunnerBase):
         return decoder_output
 
     @torch.inference_mode()
-    def _txt2img(
+    def _txt2img(self, **params):
+        return self._img2img(**params)
+
+    @torch.inference_mode()
+    def _img2img(
             self,
             prompt: str,
             negative_prompt: str = "",
+            image=None,
             seed: int = 0,
             width: int = 1024,
             height: int = 1024,
@@ -68,11 +75,18 @@ class RunnerDf(RunnerBase):
         """Generate images using Stable Cascade."""
         if seed == 0:
             seed = random.randint(0, MAX_SEED)
-        print("seed:", seed)
+            print("seed:", seed)
+        if image is not None:
+            if isinstance(image, str):
+                if image.startswith('http'):
+                    image = download_image(image)
+                else:
+                    image = decode_to_pil_image(image)
         generator = torch.Generator(device=self.device).manual_seed(seed)
-        prior_embeds = self.generate_prior(
+        prior_embeds = self._generate_prior(
             prompt=prompt,
             negative_prompt=negative_prompt,
+            image=image,
             generator=generator,
             width=width,
             height=height,
@@ -81,7 +95,7 @@ class RunnerDf(RunnerBase):
             num_images_per_prompt=batch_size,
         )
 
-        decoder_output = self.generate_decoder(
+        decoder_output = self._generate_decoder(
             prior_embeds=prior_embeds,
             prompt=prompt,
             negative_prompt=negative_prompt,

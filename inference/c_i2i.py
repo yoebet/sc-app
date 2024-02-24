@@ -3,7 +3,6 @@ import yaml
 import torch
 from tqdm import tqdm
 
-os.chdir('..')
 from inference.utils import *
 from core.utils import load_or_fail
 from train import WurstCoreC, WurstCoreB
@@ -83,6 +82,7 @@ batch['captions'] = [caption] * batch_size
 
 with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
     # torch.manual_seed(42)
+
     conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                      eval_image_embeds=False)
     unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,

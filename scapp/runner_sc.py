@@ -1,14 +1,10 @@
-import os
 import random
-from threading import Thread, Lock
 import yaml
-import torch
 from tqdm import tqdm
-import base64
 from inference.utils import *
-from core.utils import load_or_fail
 from train import WurstCoreC, WurstCoreB
 from .runner_base import RunnerBase, MAX_SEED
+from .common import decode_to_pil_image
 
 
 class RunnerSc(RunnerBase):
@@ -65,20 +61,21 @@ class RunnerSc(RunnerBase):
         self.models = models
         self.models_b = models_b
 
-    def _txt2img(self,
-                 prompt: str,
-                 negative_prompt: str = "",
-                 seed: int = 0,
-                 width: int = 1024,
-                 height: int = 1024,
-                 batch_size: int = 2,
-                 prior_num_inference_steps: int = 20,
-                 prior_guidance_scale: float = 4.0,
-                 decoder_num_inference_steps: int = 10,
-                 decoder_guidance_scale: float = 1.1,
-                 return_images_format: str = 'base64'  # pil
-                 ):
-
+    def _inference(self,
+                   prompt: str,
+                   negative_prompt: str = "",
+                   seed: int = 0,
+                   width: int = 1024,
+                   height: int = 1024,
+                   batch_size: int = 2,
+                   image=None,
+                   prior_num_inference_steps: int = 20,
+                   prior_guidance_scale: float = 4.0,
+                   decoder_num_inference_steps: int = 10,
+                   decoder_guidance_scale: float = 1.1,
+                   task_type='txt2img',  # img2img, img_variate
+                   return_images_format: str = 'base64'  # pil
+                   ):
         caption = prompt
         stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
 
@@ -102,11 +99,32 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['t_start'] = 1.0
         if seed == 0:
             seed = random.randint(0, MAX_SEED)
+            print("seed:", seed)
 
         # PREPARE CONDITIONS
         batch = {'captions': [caption] * batch_size}
+        if task_type == 'img2img' or task_type == 'img_variate':
+            if isinstance(image, str):
+                if image.startswith('http'):
+                    image = download_image(image)
+                else:
+                    image = decode_to_pil_image(image)
+            images = resize_image(image).unsqueeze(0).expand(batch_size, -1, -1, -1).to(self.device)
+            batch['images'] = images
+
+        if task_type == 'img2img':
+            noise_level = 0.8
+            effnet_latents = core.encode_latents(batch, models, extras)
+            t = torch.ones(effnet_latents.size(0), device=self.device) * noise_level
+            noised = extras.gdf.diffuse(effnet_latents, t=t)[0]
+
+            extras.sampling_configs['timesteps'] = int(decoder_num_inference_steps * noise_level)
+            extras.sampling_configs['t_start'] = noise_level
+            extras.sampling_configs['x_init'] = noised
+
+        eval_image_embeds = task_type == 'img_variate'
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
-                                         eval_image_embeds=False)
+                                         eval_image_embeds=eval_image_embeds)
         unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
                                            eval_image_embeds=False)
         conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
@@ -147,3 +165,12 @@ class RunnerSc(RunnerBase):
             'success': True,
             'images': images
         }
+
+    def _txt2img(self, **params):
+        return self._inference(**params, task_type='txt2img')
+
+    def _img2img(self, **params):
+        return self._inference(**params, task_type='img2img')
+
+    def _img_variate(self, **params):
+        return self._inference(**params, task_type='img_variate')

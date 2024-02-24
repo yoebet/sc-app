@@ -1,15 +1,8 @@
-import os
-import re
 from pprint import pformat
-import base64
-import shutil
-from io import BytesIO
-import json
 import torch
-from flask import Flask, jsonify, request, Response, abort, send_file
+from flask import Flask, jsonify, request, abort
 from dotenv import dotenv_values
-from launch import launch
-from scapp.common import get_task_dir
+from scapp.task_executor import TaskExecutor
 
 app = Flask(__name__)
 
@@ -17,6 +10,8 @@ app.config.from_mapping(dotenv_values())
 app.config.from_mapping(dotenv_values('.env.local'))
 
 logger = app.logger
+
+task_executor = TaskExecutor()
 
 
 @app.route('/', methods=('GET',))
@@ -62,18 +57,35 @@ def check_device_mem(device_index):
     })
 
 
-@app.route('/launch/txt2img', methods=('POST',))
+def build_txt2img_params(params):
+    return {
+        'prompt': params.get('prompt', None),
+        'negative_prompt': params.get('negative_prompt', None),
+        'seed': params.get('seed', 0),
+        'width': params.get('width', 1024),
+        'height': params.get('height', 1024),
+        'batch_size': params.get('batch_size', 1),
+        'prior_num_inference_steps': params.get('steps', 20),
+        'prior_guidance_scale': params.get('guidance_scale', 4.0),
+        'decoder_num_inference_steps': params.get('steps2', 10),
+        'decoder_guidance_scale': params.get('guidance_scale2', 1.1),
+        # 'return_images_format': 'base64',
+    }
+
+
+@app.route('/task/txt2img', methods=('POST',))
 def launch_task():
     req = request.get_json()
     logger.info(pformat(req))
-    task_params = req.get('params')
+    params = req.get('params')
     launch_params = req.get('launch')
     if launch_params is None:
         launch_params = {}
-    # launch_params['task_type'] = 'txt2img'
+
+    task_params = build_txt2img_params(params)
 
     try:
-        launch_result = launch(app.config, task_params, launch_params, logger=logger)
+        result = task_executor.txt2img(task_params, launch_params)
     except Exception as e:
         logger.error(e)
         return jsonify({
@@ -81,37 +93,31 @@ def launch_task():
             'error_message': f"[launch] {type(e)}: {e}"
         })
 
-    return jsonify(launch_result)
+    return jsonify(result)
 
 
-@app.route('/task/<task_id>/<sub_dir>/result', methods=('GET',))
-def get_result_info(task_id, sub_dir):
-    TASKS_DIR = app.config['TASKS_DIR']
-    task_dir = get_task_dir(TASKS_DIR, task_id, sub_dir)
+@app.route('/task/img2img', methods=('POST',))
+def launch_task():
+    req = request.get_json()
+    logger.info(pformat(req))
+    params = req.get('params')
+    launch_params = req.get('launch')
+    if launch_params is None:
+        launch_params = {}
 
-    result_file = os.path.join(task_dir, 'result.json')
-    if not os.path.exists(result_file):
+    task_params = build_txt2img_params(params)
+    task_params['image'] = params.get('image')
+
+    try:
+        result = task_executor.txt2img(task_params, launch_params)
+    except Exception as e:
+        logger.error(e)
         return jsonify({
             'success': False,
-            'error_message': 'no result file'
+            'error_message': f"[launch] {type(e)}: {e}"
         })
 
-    return send_file(result_file, mimetype='application/json', as_attachment=False)
-
-
-@app.route('/task/<task_id>/<sub_dir>/result_file/<filename>', methods=('GET',))
-def get_result_file(task_id, sub_dir, filename: str):
-    TASKS_DIR = app.config['TASKS_DIR']
-    task_dir = get_task_dir(TASKS_DIR, task_id, sub_dir)
-
-    if filename.startswith('/') or '..' in filename:
-        abort(404)
-
-    path = os.path.join(task_dir, filename)
-    if not os.path.exists(path):
-        abort(404)
-
-    return send_file(path)
+    return jsonify(result)
 
 
 def get():
