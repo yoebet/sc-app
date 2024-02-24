@@ -24,8 +24,8 @@ def resize_image(image, size=768):
 def downscale_images(images, factor=3 / 4):
     scaled_height, scaled_width = int(((images.size(-2) * factor) // 32) * 32), int(
         ((images.size(-1) * factor) // 32) * 32)
-    scaled_image = torchvision.transforms.functional.resize(images, (scaled_height, scaled_width),
-                                                            interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+    scaled_image = F.resize(images, (scaled_height, scaled_width),
+                            interpolation=torchvision.transforms.InterpolationMode.NEAREST)
     return scaled_image
 
 
@@ -44,7 +44,7 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
     grid = PIL.Image.new('RGB', size=(cols * w, rows * h))
 
     for i, img in enumerate(images):
-        img = torchvision.transforms.functional.to_pil_image(img.clamp(0, 1))
+        img = F.to_pil_image(img.clamp(0, 1))
         grid.paste(img, box=(i % cols * w, i // cols * h))
 
     bio = BytesIO()
@@ -55,13 +55,19 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
         return grid
 
 
-def to_base64_images(images):
+def to_pil_images(images):
     if images.size(1) == 1:
         images = images.repeat(1, 3, 1, 1)
     elif images.size(1) > 3:
         images = images[:, :3]
 
-    pil_imgs = [torchvision.transforms.functional.to_pil_image(img.clamp(0, 1)) for img in images]
+    return [F.to_pil_image(img.clamp(0, 1)) for img in images]
+
+
+def to_base64_images(images):
+    pil_imgs = to_pil_images(images)
+    for idx, image in enumerate(pil_imgs):
+        image.save(f'gg-{idx}.png')
     return pils_to_base64(pil_imgs)
 
 

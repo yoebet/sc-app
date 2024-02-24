@@ -2,7 +2,7 @@ import torch
 import random
 import gc
 from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
-from .runner_base import RunnerBase,MAX_SEED
+from .runner_base import RunnerBase, MAX_SEED
 from inference.utils import pils_to_base64
 
 
@@ -62,7 +62,8 @@ class RunnerDf(RunnerBase):
             prior_num_inference_steps: int = 20,
             prior_guidance_scale: float = 4.0,
             decoder_num_inference_steps: int = 10,
-            decoder_guidance_scale: float = 0.0,
+            decoder_guidance_scale: float = 0.0,  # ignore
+            return_images_format: str = 'base64'  # pil
     ):
         """Generate images using Stable Cascade."""
         if seed == 0:
@@ -86,11 +87,14 @@ class RunnerDf(RunnerBase):
             negative_prompt=negative_prompt,
             generator=generator,
             num_inference_steps=decoder_num_inference_steps,
-            guidance_scale=decoder_guidance_scale,
+            guidance_scale=0.0,
         )
 
-        encoded_images = pils_to_base64(decoder_output)
+        if return_images_format == 'pil':
+            images = decoder_output
+        else:
+            images = pils_to_base64(decoder_output)
         return {
             'success': True,
-            'encoded_images': encoded_images
+            'images': images
         }

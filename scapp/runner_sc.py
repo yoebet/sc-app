@@ -76,6 +76,7 @@ class RunnerSc(RunnerBase):
                  prior_guidance_scale: float = 4.0,
                  decoder_num_inference_steps: int = 10,
                  decoder_guidance_scale: float = 1.1,
+                 return_images_format: str = 'base64'  # pil
                  ):
 
         caption = prompt
@@ -135,9 +136,14 @@ class RunnerSc(RunnerBase):
                 sampled_b = sampled_b
             sampled = models_b.stage_a.decode(sampled_b).float()
 
+        torch.cuda.empty_cache()
+
         # show_images(sampled)
-        encoded_images = to_base64_images(sampled)
+        if return_images_format == 'pil':
+            images = to_pil_images(sampled)
+        else:
+            images = to_base64_images(sampled)
         return {
             'success': True,
-            'encoded_images': encoded_images
+            'images': images
         }

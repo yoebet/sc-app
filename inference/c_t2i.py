@@ -7,7 +7,7 @@ from inference.utils import *
 from core.utils import load_or_fail
 from train import WurstCoreC, WurstCoreB
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
 print(device)
 
 # %env http_proxy=http://54.177.243.94:8118
@@ -51,10 +51,10 @@ print("STAGE B READY")
 # )
 
 
-batch_size = 4
+batch_size = 2
 # caption = "Cinematic photo of an anthropomorphic nerdy rodent sitting in a cafe reading a book"
 caption = "Cinematic photo of an anthropomorphic penguin sitting in a cafe reading a book and having a coffee"
-height, width = 1536, 1536
+height, width = 1024, 1024
 stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
 
 # Stage C Parameters

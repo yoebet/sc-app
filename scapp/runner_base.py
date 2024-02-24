@@ -1,9 +1,4 @@
-import os
-from threading import Thread, Lock
-import yaml
-import torch
-from tqdm import tqdm
-import base64
+from threading import Thread
 import numpy as np
 from inference.utils import *
 from .fifo_lock import FIFOLock
@@ -22,6 +17,7 @@ class RunnerBase:
 
     def wrap_queued_call(self, func):
         def f(*args, **kwargs):
+            rh = kwargs.pop('result_holder')
             with self.queue_lock:
                 if not self.models_loaded:
                     if torch.cuda.is_available():
@@ -34,6 +30,8 @@ class RunnerBase:
                     self.load_models()
                     self.models_loaded = True
                 res = func(*args, **kwargs)
+            if rh is not None:
+                rh['res'] = res
             return res
 
         return f
@@ -50,6 +48,13 @@ class RunnerBase:
                 'success': False,
                 'error_message': f"busy"
             }
-        result = self.wrap_queued_call(self._txt2img)(**params)
+
+        fn = self.wrap_queued_call(self._txt2img)
+
+        result_holder = {}
+        thread = Thread(target=fn, args=[], kwargs={**params, 'result_holder': result_holder})
+        thread.start()
+        thread.join()
+        result = result_holder.get('res')
         # print(result)
         return result
