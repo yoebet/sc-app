@@ -76,7 +76,7 @@ def _build_txt2img_params(params):
 def _gen_images(task_type):
     req = request.get_json()
     logger.info(pformat(req))
-    params = req.get('params')
+    params = req.get('task')
     launch_params = req.get('launch')
     if launch_params is None:
         launch_params = {}
