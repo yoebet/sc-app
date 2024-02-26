@@ -20,14 +20,24 @@ class RunnerBase:
         self.models_loaded = False
         self.queue_lock = FIFOLock()
 
-    def get_task_dir(self, task_id: str, sub_dir: str = None):
-        return get_task_dir(self.app_config['TASKS_DIR'], task_id, sub_dir)
-
-    def build_results(self, pil_images, task_id: str, sub_dir: str = None, return_images_format: str = 'base64'):
-        task_dir = self.get_task_dir(task_id, sub_dir)
+    def build_results(self,
+                      task_type: str,
+                      pil_images,
+                      task_id: str,
+                      sub_dir: str = None,
+                      file_name_part=None,
+                      return_images_format: str = 'base64'):
+        if sub_dir is None:
+            sub_dir = task_type
+        else:
+            sub_dir = f'{sub_dir}/{task_type}'
+        task_dir = get_task_dir(self.app_config['TASKS_DIR'], task_id, sub_dir)
         os.makedirs(task_dir, exist_ok=True)
         for idx, img in enumerate(pil_images):
-            img.save(os.path.join(task_dir, f'output_{idx + 1}.png'))
+            file_base = f'output_{idx + 1}'
+            if file_name_part is not None:
+                file_base = f'{file_base}-{file_name_part}'
+            img.save(os.path.join(task_dir, f'{file_base}.png'))
 
         if return_images_format == 'pil':
             images = pil_images

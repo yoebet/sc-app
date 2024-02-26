@@ -14,3 +14,4 @@ jobs/*.sh
 .tasks/
 .logs/
 .env.local
+/http/http-client.private.env.json

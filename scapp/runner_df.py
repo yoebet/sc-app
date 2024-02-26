@@ -106,6 +106,9 @@ class RunnerDf(RunnerBase):
             guidance_scale=0.0,
         )
 
-        return self.build_results(images, task_id,
+        return self.build_results('txt2img' if image is None else 'img2img',
+                                  images,
+                                  task_id,
                                   sub_dir=sub_dir,
+                                  file_name_part=f'{width}x{height}',
                                   return_images_format=return_images_format)

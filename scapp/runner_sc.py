@@ -161,8 +161,11 @@ class RunnerSc(RunnerBase):
 
         images = to_pil_images(sampled)
 
-        return self.build_results(images, task_id,
+        return self.build_results(task_type,
+                                  images,
+                                  task_id,
                                   sub_dir=sub_dir,
+                                  file_name_part=f'{width}x{height}',
                                   return_images_format=return_images_format)
 
     def _txt2img(self, **params):

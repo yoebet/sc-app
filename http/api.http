@@ -22,18 +22,18 @@ Authorization: {{auth}}
 
 ### txt2img
 
-POST /task/txt2img
+POST {{base}}/task/txt2img
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
 
 {
-  "params": {
+  "task": {
     "prompt": "The sprirt of a Tamagotchi wandering in the city of Los Angeles",
     "negative_prompt": "",
     "seed": 0,
-    "width": 1024,
-    "height": 1024,
+    "width": 1536,
+    "height": 1536,
     "batch_size": 2,
     "steps": 20,
     "guidance_scale": 4.0,
@@ -41,7 +41,7 @@ Authorization: {{auth}}
     "guidance_scale2": 1.1
   },
   "launch": {
-    "device_index": 6
+    "device_index": 3
   }
 }
 
@@ -54,12 +54,12 @@ Accept: application/json
 Authorization: {{auth}}
 
 {
-  "params": {
+  "task": {
     "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
-    "prompt": "a cup of coffee",
+    "prompt": "a cup of tea",
     "negative_prompt": "",
     "seed": 0,
-    "width": 1024,
+    "width": 880,
     "height": 1024,
     "batch_size": 2,
     "steps": 20,
@@ -68,7 +68,7 @@ Authorization: {{auth}}
     "guidance_scale2": 1.1
   },
   "launch": {
-    "device_index": 6
+    "device_index": 2
   }
 }
 
@@ -81,12 +81,12 @@ Accept: application/json
 Authorization: {{auth}}
 
 {
-  "params": {
+  "task": {
     "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
-    "prompt": "a cup of coffee",
+    "prompt": "a cup of tea",
     "negative_prompt": "",
     "seed": 0,
-    "width": 1024,
+    "width": 800,
     "height": 1024,
     "batch_size": 2,
     "steps": 20,
@@ -95,7 +95,7 @@ Authorization: {{auth}}
     "guidance_scale2": 1.1
   },
   "launch": {
-    "device_index": 6
+    "device_index": 2
   }
 }
 
