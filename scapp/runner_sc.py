@@ -1,3 +1,4 @@
+import os
 import random
 import yaml
 from tqdm import tqdm
@@ -8,8 +9,8 @@ from .common import decode_to_pil_image
 
 
 class RunnerSc(RunnerBase):
-    def __init__(self, device):
-        super().__init__(device)
+    def __init__(self, app_config, device):
+        super().__init__(app_config, device)
         self.core = None
         self.core_b = None
         self.extras = None
@@ -62,6 +63,7 @@ class RunnerSc(RunnerBase):
         self.models_b = models_b
 
     def _inference(self,
+                   task_id: str,
                    prompt: str,
                    negative_prompt: str = "",
                    seed: int = 0,
@@ -74,7 +76,8 @@ class RunnerSc(RunnerBase):
                    decoder_num_inference_steps: int = 10,
                    decoder_guidance_scale: float = 1.1,
                    task_type='txt2img',  # img2img, img_variate
-                   return_images_format: str = 'base64'  # pil
+                   return_images_format: str = 'base64',  # pil
+                   sub_dir: str = None,
                    ):
         caption = prompt
         stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
@@ -97,7 +100,7 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['shift'] = 1
         extras_b.sampling_configs['timesteps'] = decoder_num_inference_steps
         extras_b.sampling_configs['t_start'] = 1.0
-        if seed == 0:
+        if seed <= 0:
             seed = random.randint(0, MAX_SEED)
             print("seed:", seed)
 
@@ -156,15 +159,11 @@ class RunnerSc(RunnerBase):
 
         torch.cuda.empty_cache()
 
-        # show_images(sampled)
-        if return_images_format == 'pil':
-            images = to_pil_images(sampled)
-        else:
-            images = to_base64_images(sampled)
-        return {
-            'success': True,
-            'images': images
-        }
+        images = to_pil_images(sampled)
+
+        return self.build_results(images, task_id,
+                                  sub_dir=sub_dir,
+                                  return_images_format=return_images_format)
 
     def _txt2img(self, **params):
         return self._inference(**params, task_type='txt2img')

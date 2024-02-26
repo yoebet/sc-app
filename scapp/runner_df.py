@@ -3,13 +3,13 @@ import random
 import gc
 from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
 from .runner_base import RunnerBase, MAX_SEED
-from inference.utils import pils_to_base64, download_image
+from inference.utils import download_image
 from .common import decode_to_pil_image
 
 
 class RunnerDf(RunnerBase):
-    def __init__(self, device):
-        super().__init__(device)
+    def __init__(self, app_config, device):
+        super().__init__(app_config, device)
         self.prior = None
         self.decoder = None
 
@@ -59,6 +59,7 @@ class RunnerDf(RunnerBase):
     @torch.inference_mode()
     def _img2img(
             self,
+            task_id: str,
             prompt: str,
             negative_prompt: str = "",
             image=None,
@@ -70,10 +71,11 @@ class RunnerDf(RunnerBase):
             prior_guidance_scale: float = 4.0,
             decoder_num_inference_steps: int = 10,
             decoder_guidance_scale: float = 0.0,  # ignore
-            return_images_format: str = 'base64'  # pil
+            return_images_format: str = 'base64',  # pil
+            sub_dir: str = None,
     ):
         """Generate images using Stable Cascade."""
-        if seed == 0:
+        if seed <= 0:
             seed = random.randint(0, MAX_SEED)
             print("seed:", seed)
         if image is not None:
@@ -95,7 +97,7 @@ class RunnerDf(RunnerBase):
             num_images_per_prompt=batch_size,
         )
 
-        decoder_output = self._generate_decoder(
+        images = self._generate_decoder(
             prior_embeds=prior_embeds,
             prompt=prompt,
             negative_prompt=negative_prompt,
@@ -104,11 +106,6 @@ class RunnerDf(RunnerBase):
             guidance_scale=0.0,
         )
 
-        if return_images_format == 'pil':
-            images = decoder_output
-        else:
-            images = pils_to_base64(decoder_output)
-        return {
-            'success': True,
-            'images': images
-        }
+        return self.build_results(images, task_id,
+                                  sub_dir=sub_dir,
+                                  return_images_format=return_images_format)

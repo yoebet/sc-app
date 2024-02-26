@@ -5,7 +5,8 @@ from scapp.runner_df import RunnerDf
 
 
 class TaskExecutor:
-    def __init__(self):
+    def __init__(self, app_config):
+        self.app_config = app_config
         self.runners = {}
         self.runners_df = {}
 
@@ -17,9 +18,9 @@ class TaskExecutor:
         if runner is None:
             device = torch.device(device_name)
             if type == 'df':
-                runner = RunnerDf(device)
+                runner = RunnerDf(self.app_config, device)
             else:
-                runner = RunnerSc(device)
+                runner = RunnerSc(self.app_config, device)
             runners[device_name] = runner
         return runner
 

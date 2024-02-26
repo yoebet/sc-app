@@ -66,8 +66,6 @@ def to_pil_images(images):
 
 def to_base64_images(images):
     pil_imgs = to_pil_images(images)
-    for idx, image in enumerate(pil_imgs):
-        image.save(f'gg-{idx}.png')
     return pils_to_base64(pil_imgs)
 
 

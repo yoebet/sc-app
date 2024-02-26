@@ -1,3 +1,4 @@
+import time
 from pprint import pformat
 import torch
 from flask import Flask, jsonify, request, abort
@@ -11,7 +12,7 @@ app.config.from_mapping(dotenv_values('.env.local'))
 
 logger = app.logger
 
-task_executor = TaskExecutor()
+task_executor = TaskExecutor(app.config)
 
 
 @app.route('/', methods=('GET',))
@@ -58,9 +59,14 @@ def check_device_mem(device_index):
 
 
 def _build_txt2img_params(params):
+    task_id = params.get('task_id')
+    if task_id is None:
+        task_id = str(int(time.time()))
     return {
+        'task_id': task_id,
+        'sub_dir': params.get('sub_dir', None),
         'prompt': params.get('prompt', None),
-        'negative_prompt': params.get('negative_prompt', None),
+        'negative_prompt': params.get('negative_prompt', ''),
         'seed': params.get('seed', 0),
         'width': params.get('width', 1024),
         'height': params.get('height', 1024),
@@ -89,7 +95,8 @@ def _gen_images(task_type):
         fn = getattr(task_executor, task_type)
         result = fn(task_params, launch_params)
     except Exception as e:
-        logger.error(e)
+        task_id = task_params.get('task_id')
+        logger.error(f"task {task_id} ({task_type}) failed: {type(e)}: {e}")
         return jsonify({
             'success': False,
             'error_message': f"[launch] {type(e)}: {e}"

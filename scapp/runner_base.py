@@ -1,7 +1,9 @@
+import os
 from threading import Thread
 import numpy as np
 from inference.utils import *
 from .fifo_lock import FIFOLock
+from .common import get_task_dir
 
 MAX_WAITING = 1
 
@@ -12,10 +14,30 @@ MIN_FREE_GPU_MEM_G = 20
 
 
 class RunnerBase:
-    def __init__(self, device):
+    def __init__(self, app_config, device):
+        self.app_config = app_config
         self.device = device
         self.models_loaded = False
         self.queue_lock = FIFOLock()
+
+    def get_task_dir(self, task_id: str, sub_dir: str = None):
+        return get_task_dir(self.app_config['TASKS_DIR'], task_id, sub_dir)
+
+    def build_results(self, pil_images, task_id: str, sub_dir: str = None, return_images_format: str = 'base64'):
+        task_dir = self.get_task_dir(task_id, sub_dir)
+        os.makedirs(task_dir, exist_ok=True)
+        for idx, img in enumerate(pil_images):
+            img.save(os.path.join(task_dir, f'output_{idx + 1}.png'))
+
+        if return_images_format == 'pil':
+            images = pil_images
+        else:
+            images = pils_to_base64(pil_images)
+
+        return {
+            'success': True,
+            'images': images
+        }
 
     def load_models(self):
         ...
