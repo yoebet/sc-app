@@ -99,7 +99,7 @@ def _gen_images(task_type):
         logger.error(f"task {task_id} ({task_type}) failed: {type(e)}: {e}")
         return jsonify({
             'success': False,
-            'error_message': f"[launch] {type(e)}: {e}"
+            'error_message': f"{type(e)}: {e}"
         })
 
     return jsonify(result)

@@ -1,3 +1,4 @@
+import logging
 import torch
 import random
 import gc
@@ -8,8 +9,8 @@ from .common import decode_to_pil_image
 
 
 class RunnerDf(RunnerBase):
-    def __init__(self, app_config, device):
-        super().__init__(app_config, device)
+    def __init__(self, device, app_config, logger: logging.Logger = None):
+        super().__init__(device, app_config, logger)
         self.prior = None
         self.decoder = None
 

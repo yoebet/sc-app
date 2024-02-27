@@ -1,4 +1,4 @@
-import os
+import logging
 import random
 import yaml
 from tqdm import tqdm
@@ -9,8 +9,8 @@ from .common import decode_to_pil_image
 
 
 class RunnerSc(RunnerBase):
-    def __init__(self, app_config, device):
-        super().__init__(app_config, device)
+    def __init__(self, device, app_config, logger: logging.Logger = None):
+        super().__init__(device, app_config, logger)
         self.core = None
         self.core_b = None
         self.extras = None
@@ -81,6 +81,8 @@ class RunnerSc(RunnerBase):
                    ):
         caption = prompt
         stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
+        if decoder_guidance_scale < 0.5:
+            decoder_guidance_scale = 0.5
 
         core = self.core
         core_b = self.core_b

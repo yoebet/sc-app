@@ -1,3 +1,4 @@
+import logging
 import os
 from threading import Thread
 import numpy as np
@@ -14,9 +15,10 @@ MIN_FREE_GPU_MEM_G = 20
 
 
 class RunnerBase:
-    def __init__(self, app_config, device):
-        self.app_config = app_config
+    def __init__(self, device, app_config, logger: logging.Logger = None):
         self.device = device
+        self.app_config = app_config
+        self.logger = logger
         self.models_loaded = False
         self.queue_lock = FIFOLock()
 
@@ -63,6 +65,8 @@ class RunnerBase:
 
     def wrap_queued_call(self, func):
         def f(*args, **kwargs):
+            if self.logger is not None:
+                self.logger.info(f'<<<')
             rh = kwargs.pop('result_holder')
             with self.queue_lock:
                 if not self.models_loaded:
@@ -76,6 +80,7 @@ class RunnerBase:
                     self.load_models()
                     self.models_loaded = True
                 res = func(*args, **kwargs)
+                self.logger.info(f'>>>')
             if rh is not None:
                 rh['res'] = res
             return res
@@ -96,6 +101,14 @@ class RunnerBase:
         thread.start()
         thread.join()
         result = result_holder.get('res')
+        if result is None:
+            task_id = params.get('task_id', '?')
+            self.logger.error(f'task {task_id} failed.')
+            raise Exception('task failed.')
+
+        if self.logger is not None:
+            task_id = params.get('task_id', '?')
+            self.logger.info(f'task {task_id} finished.')
         return result
 
     def txt2img(self, **params):

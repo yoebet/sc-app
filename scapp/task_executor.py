@@ -1,12 +1,14 @@
 import torch
+import logging
 from scapp.common import get_device_name
 from scapp.runner_sc import RunnerSc
 from scapp.runner_df import RunnerDf
 
 
 class TaskExecutor:
-    def __init__(self, app_config):
+    def __init__(self, app_config, logger: logging.Logger = None):
         self.app_config = app_config
+        self.logger = logger
         self.runners = {}
         self.runners_df = {}
 
@@ -18,9 +20,9 @@ class TaskExecutor:
         if runner is None:
             device = torch.device(device_name)
             if type == 'df':
-                runner = RunnerDf(self.app_config, device)
+                runner = RunnerDf(device, self.app_config)
             else:
-                runner = RunnerSc(self.app_config, device)
+                runner = RunnerSc(device, self.app_config)
             runners[device_name] = runner
         return runner
 
