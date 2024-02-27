@@ -1,4 +1,5 @@
 import time
+import traceback
 from pprint import pformat
 import torch
 from flask import Flask, jsonify, request, abort
@@ -95,6 +96,7 @@ def _gen_images(task_type):
         fn = getattr(task_executor, task_type)
         result = fn(task_params, launch_params)
     except Exception as e:
+        traceback.print_exc()
         task_id = task_params.get('task_id')
         logger.error(f"task {task_id} ({task_type}) failed: {type(e)}: {e}")
         return jsonify({
