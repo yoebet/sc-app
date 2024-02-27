@@ -69,6 +69,8 @@ class RunnerBase:
                 self.logger.info(f'<<<')
             rh = kwargs.pop('result_holder')
             with self.queue_lock:
+                if self.logger is not None:
+                    self.logger.info(f'got queue_lock')
                 if not self.models_loaded:
                     if torch.cuda.is_available():
                         free, total = torch.cuda.mem_get_info(self.device)
@@ -79,8 +81,11 @@ class RunnerBase:
                             }
                     self.load_models()
                     self.models_loaded = True
+                if self.logger is not None:
+                    self.logger.info(f'func ...')
                 res = func(*args, **kwargs)
-                self.logger.info(f'>>>')
+                if self.logger is not None:
+                    self.logger.info(f'>>>')
             if rh is not None:
                 rh['res'] = res
             return res
@@ -102,8 +107,9 @@ class RunnerBase:
         thread.join()
         result = result_holder.get('res')
         if result is None:
-            task_id = params.get('task_id', '?')
-            self.logger.error(f'task {task_id} failed.')
+            if self.logger is not None:
+                task_id = params.get('task_id', '?')
+                self.logger.error(f'task {task_id} failed.')
             raise Exception('task failed.')
 
         if self.logger is not None:

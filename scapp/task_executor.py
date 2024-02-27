@@ -20,9 +20,9 @@ class TaskExecutor:
         if runner is None:
             device = torch.device(device_name)
             if type == 'df':
-                runner = RunnerDf(device, self.app_config)
+                runner = RunnerDf(device, self.app_config, logger=self.logger)
             else:
-                runner = RunnerSc(device, self.app_config)
+                runner = RunnerSc(device, self.app_config, logger=self.logger)
             runners[device_name] = runner
         return runner
 
