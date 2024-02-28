@@ -1,5 +1,6 @@
 import logging
 import os
+import traceback
 from threading import Thread
 import numpy as np
 from inference.utils import *
@@ -15,7 +16,7 @@ MIN_FREE_GPU_MEM_G = 20
 
 
 class RunnerBase:
-    def __init__(self, device, app_config, logger: logging.Logger = None):
+    def __init__(self, device, app_config, logger: logging.Logger):
         self.device = device
         self.app_config = app_config
         self.logger = logger
@@ -29,6 +30,11 @@ class RunnerBase:
                       sub_dir: str = None,
                       file_name_part=None,
                       return_images_format: str = 'base64'):
+        if pil_images is None:
+            return {
+                'success': False
+            }
+
         if sub_dir is None:
             sub_dir = task_type
         else:
@@ -65,27 +71,21 @@ class RunnerBase:
 
     def wrap_queued_call(self, func):
         def f(*args, **kwargs):
-            if self.logger is not None:
-                self.logger.info(f'<<<')
             rh = kwargs.pop('result_holder')
             with self.queue_lock:
-                if self.logger is not None:
-                    self.logger.info(f'got queue_lock')
                 if not self.models_loaded:
                     if torch.cuda.is_available():
                         free, total = torch.cuda.mem_get_info(self.device)
                         if free < MIN_FREE_GPU_MEM_G * (1024 ** 3):
-                            return {
-                                'success': False,
-                                'error_message': 'device occupied',
-                            }
+                            self.logger.error(f'device occupied: free: {free}, total: {total}')
+                            if rh is not None:
+                                rh['res'] = {
+                                    'success': False,
+                                    'error_message': 'device occupied',
+                                }
                     self.load_models()
                     self.models_loaded = True
-                if self.logger is not None:
-                    self.logger.info(f'func ...')
                 res = func(*args, **kwargs)
-                if self.logger is not None:
-                    self.logger.info(f'>>>')
             if rh is not None:
                 rh['res'] = res
             return res
@@ -99,22 +99,20 @@ class RunnerBase:
                 'error_message': f"busy"
             }
 
-        fn = self.wrap_queued_call(fn)
+        target = self.wrap_queued_call(fn)
 
         result_holder = {}
-        thread = Thread(target=fn, args=[], kwargs={**params, 'result_holder': result_holder})
-        thread.start()
+        thread = Thread(target=target, args=[], kwargs={**params, 'result_holder': result_holder})
+        thread.run()
         thread.join()
         result = result_holder.get('res')
         if result is None:
-            if self.logger is not None:
-                task_id = params.get('task_id', '?')
-                self.logger.error(f'task {task_id} failed.')
+            task_id = params.get('task_id', '?')
+            self.logger.error(f'task {task_id} failed.')
             raise Exception('task failed.')
 
-        if self.logger is not None:
-            task_id = params.get('task_id', '?')
-            self.logger.info(f'task {task_id} finished.')
+        task_id = params.get('task_id', '?')
+        self.logger.info(f'task {task_id} finished.')
         return result
 
     def txt2img(self, **params):
@@ -124,4 +122,4 @@ class RunnerBase:
         return self._run(self._img2img, params=params)
 
     def img_variate(self, **params):
-        return self._run(self._img2img, params=params)
+        return self._run(self._img_variate, params=params)

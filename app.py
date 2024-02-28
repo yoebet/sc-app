@@ -13,7 +13,7 @@ app.config.from_mapping(dotenv_values('.env.local'))
 
 logger = app.logger
 
-task_executor = TaskExecutor(app.config)
+task_executor = TaskExecutor(app.config, logger=logger)
 
 
 @app.route('/', methods=('GET',))
@@ -101,7 +101,7 @@ def _gen_images(task_type):
         logger.error(f"task {task_id} ({task_type}) failed: {type(e)}: {e}")
         return jsonify({
             'success': False,
-            'error_message': f"{type(e)}: {e}"
+            'error_message': str(e)
         })
 
     return jsonify(result)

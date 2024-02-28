@@ -8,7 +8,15 @@ from scapp.runner_df import RunnerDf
 class TaskExecutor:
     def __init__(self, app_config, logger: logging.Logger = None):
         self.app_config = app_config
-        self.logger = logger
+        if logger is None:
+            logging.basicConfig(
+                format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+                level=logging.INFO,
+            )
+            self.logger = logging.getLogger('launch')
+        else:
+            self.logger = logger
         self.runners = {}
         self.runners_df = {}
 
