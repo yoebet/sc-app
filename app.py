@@ -5,6 +5,7 @@ import torch
 from flask import Flask, jsonify, request, abort
 from dotenv import dotenv_values
 from scapp.task_executor import TaskExecutor
+from scapp.common import trans_unit
 
 app = Flask(__name__)
 
@@ -28,15 +29,6 @@ def before_request_callback():
         auth = request.headers.get('AUTHORIZATION')
         if not auth == app.config['AUTHORIZATION']:
             abort(400)
-
-
-def trans_unit(bytes, unit):
-    if unit is None:
-        return bytes
-    k = 1024
-    m = k * k
-    div = {'B': 1, 'K': k, 'M': m, 'G': k * m}.get(unit.upper())
-    return bytes / div
 
 
 @app.route('/check_mem_all/available', methods=('GET',))

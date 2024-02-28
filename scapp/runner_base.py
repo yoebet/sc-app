@@ -5,7 +5,7 @@ from threading import Thread
 import numpy as np
 from inference.utils import *
 from .fifo_lock import FIFOLock
-from .common import get_task_dir
+from .common import get_task_dir, trans_unit
 
 MAX_WAITING = 1
 
@@ -77,12 +77,14 @@ class RunnerBase:
                     if torch.cuda.is_available():
                         free, total = torch.cuda.mem_get_info(self.device)
                         if free < MIN_FREE_GPU_MEM_G * (1024 ** 3):
-                            self.logger.error(f'device occupied: free: {free}, total: {total}')
+                            free_t, total_t = trans_unit(free, 'G'), trans_unit(total, 'G')
+                            self.logger.error(f'device occupied: free {free_t} G, total {total_t} G')
                             if rh is not None:
                                 rh['res'] = {
                                     'success': False,
                                     'error_message': 'device occupied',
                                 }
+                            return
                     self.load_models()
                     self.models_loaded = True
                 res = func(*args, **kwargs)
@@ -103,7 +105,7 @@ class RunnerBase:
 
         result_holder = {}
         thread = Thread(target=target, args=[], kwargs={**params, 'result_holder': result_holder})
-        thread.run()
+        thread.start()
         thread.join()
         result = result_holder.get('res')
         if result is None:

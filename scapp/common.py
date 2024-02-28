@@ -9,6 +9,15 @@ from urllib.parse import urlparse
 import torch
 
 
+def trans_unit(bytes, unit):
+    if unit is None:
+        return bytes
+    k = 1024
+    m = k * k
+    div = {'B': 1, 'K': k, 'M': m, 'G': k * m}.get(unit.upper())
+    return bytes / div
+
+
 def get_device_name(launch_params):
     if torch.cuda.is_available():
         device_index = launch_params.get('device_index')
