@@ -1,4 +1,6 @@
 import logging
+import sys
+
 import torch
 import random
 import gc
@@ -34,8 +36,8 @@ class RunnerDf(RunnerBase):
             num_inference_steps=num_inference_steps
         )
         # prior.to('cpu')
-        torch.cuda.empty_cache()
-        gc.collect()
+        # torch.cuda.empty_cache()
+        # gc.collect()
         return prior_output.image_embeddings
 
     def _generate_decoder(self, prior_embeds, prompt, negative_prompt, generator, num_inference_steps, guidance_scale):
@@ -49,8 +51,8 @@ class RunnerDf(RunnerBase):
             generator=generator
         ).images
         # decoder.to('cpu')
-        torch.cuda.empty_cache()
-        gc.collect()
+        # torch.cuda.empty_cache()
+        # gc.collect()
         return decoder_output
 
     @torch.inference_mode()

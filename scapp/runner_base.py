@@ -1,7 +1,6 @@
 import logging
 import os
-import traceback
-from threading import Thread
+import gc
 import numpy as np
 from inference.utils import *
 from .fifo_lock import FIFOLock
@@ -71,25 +70,22 @@ class RunnerBase:
 
     def wrap_queued_call(self, func):
         def f(*args, **kwargs):
-            rh = kwargs.pop('result_holder')
             with self.queue_lock:
                 if not self.models_loaded:
                     if torch.cuda.is_available():
                         free, total = torch.cuda.mem_get_info(self.device)
                         if free < MIN_FREE_GPU_MEM_G * (1024 ** 3):
                             free_t, total_t = trans_unit(free, 'G'), trans_unit(total, 'G')
-                            self.logger.error(f'device occupied: free {free_t} G, total {total_t} G')
-                            if rh is not None:
-                                rh['res'] = {
-                                    'success': False,
-                                    'error_message': 'device occupied',
-                                }
-                            return
+                            self.logger.error(f'device occupied: free {free_t:.02f} G, total {total_t:.02f} G')
+                            return {
+                                'success': False,
+                                'error_message': 'device occupied',
+                            }
                     self.load_models()
                     self.models_loaded = True
                 res = func(*args, **kwargs)
-            if rh is not None:
-                rh['res'] = res
+                gc.collect()
+                torch.cuda.empty_cache()
             return res
 
         return f
@@ -103,11 +99,7 @@ class RunnerBase:
 
         target = self.wrap_queued_call(fn)
 
-        result_holder = {}
-        thread = Thread(target=target, args=[], kwargs={**params, 'result_holder': result_holder})
-        thread.start()
-        thread.join()
-        result = result_holder.get('res')
+        result = target(**params)
         if result is None:
             task_id = params.get('task_id', '?')
             self.logger.error(f'task {task_id} failed.')

@@ -6,8 +6,9 @@ from tqdm import tqdm
 from inference.utils import *
 from core.utils import load_or_fail
 from train import WurstCoreC, WurstCoreB
+from scapp.common import decode_to_pil_image
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
 print(device)
 
 # SETUP STAGE C
@@ -48,7 +49,7 @@ print("STAGE B READY")
 
 
 batch_size = 4
-url = "https://media.discordapp.net/attachments/1121232062708457508/1205134776206491648/image.png?ex=65d74438&is=65c4cf38&hm=fcb40fc6bbe437dee481afffcd94e25c5511d059341b2f2b6e046f157e6b9371&=&format=webp&quality=lossless"
+url = "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png"
 images = resize_image(download_image(url)).unsqueeze(0).expand(batch_size, -1, -1, -1).to(device)
 
 batch = {'images': images}
@@ -74,15 +75,16 @@ extras_b.sampling_configs['t_start'] = 1.0
 # PREPARE CONDITIONS
 batch['captions'] = [caption] * batch_size
 
+conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
+                                 eval_image_embeds=True)
+unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
+                                   eval_image_embeds=False)
+conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
+unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
+
+
 with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
     # torch.manual_seed(42)
-    conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
-                                     eval_image_embeds=True)
-    unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
-                                       eval_image_embeds=False)
-    conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
-    unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
-
     sampling_c = extras.gdf.sample(
         models.generator, conditions, stage_c_latent_shape,
         unconditions, device=device, **extras.sampling_configs,
@@ -104,4 +106,6 @@ with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
         sampled_b = sampled_b
     sampled = models_b.stage_a.decode(sampled_b).float()
 
-show_images(sampled)
+# show_images(sampled)
+images = to_pil_images(sampled)
+images[0].save('a.png')

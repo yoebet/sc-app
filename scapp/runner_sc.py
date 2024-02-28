@@ -159,8 +159,6 @@ class RunnerSc(RunnerBase):
                 sampled_b = sampled_b
             sampled = models_b.stage_a.decode(sampled_b).float()
 
-        torch.cuda.empty_cache()
-
         images = to_pil_images(sampled)
 
         return self.build_results(task_type,
