@@ -80,6 +80,7 @@ class RunnerSc(RunnerBase):
                    sub_dir: str = None,
                    ):
         caption = prompt
+        neg_caption = negative_prompt if negative_prompt is not None else ""
         stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
         if decoder_guidance_scale < 0.5:
             decoder_guidance_scale = 0.5
@@ -107,7 +108,7 @@ class RunnerSc(RunnerBase):
             print("seed:", seed)
 
         # PREPARE CONDITIONS
-        batch = {'captions': [caption] * batch_size}
+        batch = {'captions': [caption] * batch_size, 'neg_captions': [neg_caption] * batch_size}
         if task_type == 'img2img' or task_type == 'img_variate':
             if isinstance(image, str):
                 if image.startswith('http'):
