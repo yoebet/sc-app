@@ -138,8 +138,8 @@ class DataCore(WarpCore):
         if return_fields is None:
             return_fields = ['clip_text', 'clip_text_pooled', 'clip_img']
 
-        captions = batch.get('captions', None)
-        # negative
+        captions = batch.get('captions')
+        neg_captions = batch.get('neg_captions', None)
         images = batch.get('images', None)
         batch_size = len(captions)
 
@@ -148,8 +148,7 @@ class DataCore(WarpCore):
         if 'clip_text' in return_fields or 'clip_text_pooled' in return_fields:
             if is_eval:
                 if is_unconditional:
-                    captions_unpooled = ["" for _ in range(batch_size)]
-                    #     ...
+                    captions_unpooled = ["" for _ in range(batch_size)] if neg_captions is None else neg_captions
                 else:
                     captions_unpooled = captions
             else:
