@@ -84,6 +84,8 @@ class RunnerSc(RunnerBase):
         stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
         if decoder_guidance_scale < 0.5:
             decoder_guidance_scale = 0.5
+        if decoder_guidance_scale == 7:
+            decoder_guidance_scale = 4
 
         core = self.core
         core_b = self.core_b
