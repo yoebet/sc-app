@@ -74,6 +74,7 @@ class RunnerDf(RunnerBase):
             prior_guidance_scale: float = 4.0,
             decoder_num_inference_steps: int = 10,
             decoder_guidance_scale: float = 0.0,  # ignore
+            task_type='txt2img',
             return_images_format: str = 'base64',  # pil
             sub_dir: str = None,
     ):
@@ -87,6 +88,7 @@ class RunnerDf(RunnerBase):
                     image = download_image(image)
                 else:
                     image = decode_to_pil_image(image)
+            task_type = 'img2img'
         generator = torch.Generator(device=self.device).manual_seed(seed)
         prior_embeds = self._generate_prior(
             prompt=prompt,
@@ -109,7 +111,7 @@ class RunnerDf(RunnerBase):
             guidance_scale=0.0,
         )
 
-        return self.build_results('txt2img' if image is None else 'img2img',
+        return self.build_results(task_type,
                                   images,
                                   task_id,
                                   sub_dir=sub_dir,

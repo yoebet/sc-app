@@ -172,10 +172,10 @@ class RunnerSc(RunnerBase):
                                   return_images_format=return_images_format)
 
     def _txt2img(self, **params):
-        return self._inference(**params, task_type='txt2img')
+        return self._inference(**params)
 
     def _img2img(self, **params):
-        return self._inference(**params, task_type='img2img')
+        return self._inference(**params)
 
     def _img_variate(self, **params):
-        return self._inference(**params, task_type='img_variate')
+        return self._inference(**params)
