@@ -1,3 +1,4 @@
+import os
 import time
 import traceback
 from pprint import pformat
@@ -11,6 +12,9 @@ app = Flask(__name__)
 
 app.config.from_mapping(dotenv_values())
 app.config.from_mapping(dotenv_values('.env.local'))
+device_index = os.environ['DEVICE_INDEX']
+if device_index is not None and device_index != '':
+    app.config.update(device_index=int(device_index))
 
 logger = app.logger
 

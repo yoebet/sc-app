@@ -11,7 +11,7 @@ jobs/*.sh
 *.safetensors
 *_test.yaml
 .idea/
-.tasks/
-.logs/
+tasks/
+logs/
 .env.local
 /http/http-client.private.env.json

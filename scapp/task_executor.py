@@ -21,7 +21,12 @@ class TaskExecutor:
         self.runners_df = {}
 
     def get_runner(self, launch_params):
-        device_name = get_device_name(launch_params)
+        device_index = self.app_config['device_index']
+        if device_index is not None:
+            device_name = f'cuda:{device_index}'
+        else:
+            device_name = get_device_name(launch_params)
+        self.logger.info(f'device: {device_name}')
         type = launch_params.get('runner', 'sc')
         runners = self.runners if type == 'sc' else self.runners_df
         runner = runners.get(device_name)
