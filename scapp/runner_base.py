@@ -10,7 +10,6 @@ from .common import get_task_dir, trans_unit
 MAX_WAITING = 1
 
 MAX_SEED = np.iinfo(np.int32).max
-# MAX_IMAGE_SIZE = 1536
 
 MIN_FREE_GPU_MEM_G = 20
 
@@ -108,15 +107,9 @@ class RunnerBase:
                 'error_message': f"busy"
             }
 
-        params['task_type'] = fn.__class__.__name__
-
+        params['task_type'] = fn.__name__[1:]
         target = self.wrap_queued_call(fn)
-
         result = target(**params)
-        if result is None:
-            task_id = params.get('task_id', '?')
-            self.logger.error(f'task {task_id} failed.')
-            raise Exception('task failed.')
 
         task_id = params.get('task_id', '?')
         self.logger.info(f'task {task_id} finished.')
