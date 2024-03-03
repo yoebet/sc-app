@@ -78,7 +78,10 @@ class RunnerDf(RunnerBase):
             return_images_format: str = 'base64',  # pil
             sub_dir: str = None,
     ):
-        """Generate images using Stable Cascade."""
+        if width is None:
+            width = 1024
+        if height is None:
+            height = 1024
         if seed <= 0:
             seed = random.randint(0, MAX_SEED)
             print("seed:", seed)

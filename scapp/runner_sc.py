@@ -79,6 +79,10 @@ class RunnerSc(RunnerBase):
                    return_images_format: str = 'base64',  # pil
                    sub_dir: str = None,
                    ):
+        if width is None:
+            width = 1024
+        if height is None:
+            height = 1024
         caption = prompt
         neg_caption = negative_prompt if negative_prompt is not None else ""
         stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
@@ -99,6 +103,7 @@ class RunnerSc(RunnerBase):
         extras.sampling_configs['shift'] = 2
         extras.sampling_configs['timesteps'] = prior_num_inference_steps
         extras.sampling_configs['t_start'] = 1.0
+        extras.sampling_configs['x_init'] = None
 
         # Stage B Parameters
         extras_b.sampling_configs['cfg'] = decoder_guidance_scale
