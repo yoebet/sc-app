@@ -78,6 +78,7 @@ class RunnerDf(RunnerBase):
             task_type='txt2img',
             return_images_format: str = 'base64',  # pil
             sub_dir: str = None,
+            **extra_params,
     ):
         if width is None:
             width = 1024

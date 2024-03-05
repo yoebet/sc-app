@@ -50,3 +50,7 @@ class TaskExecutor:
     def img_variate(self, task_params, launch_params):
         runner = self.get_runner(launch_params)
         return runner.img_variate(**task_params)
+
+    def img_gen(self, task_params, launch_params):
+        runner = self.get_runner(launch_params)
+        return runner.img_gen(**task_params)

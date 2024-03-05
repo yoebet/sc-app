@@ -109,7 +109,6 @@ class RunnerBase:
                 'error_message': f"busy"
             }
 
-        params['task_type'] = fn.__name__[1:]
         target = self.wrap_queued_call(fn)
         result = target(**params)
 

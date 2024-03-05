@@ -29,19 +29,19 @@ Authorization: {{auth}}
 
 {
   "task": {
-    "seed": 2707236067,
+    "seed": 2796926360,
     "steps": 20,
-    "width": 1024,
-    "height": 1024,
-    "prompt": "1girl, valley",
-    "sub_dir": "2024-02-27",
-    "task_id": "Fae66ItuWIneYWXj",
-    "batch_size": 2,
-    "guidance_scale": 7,
-    "negative_prompt": ""
+    "width": 768,
+    "height": 1152,
+    "prompt": " youthful girl, sweet and gentle-looking, with hopeful, round eyes. Action: Diving downward with arms outstretched. Background: A fantastic and beautiful sky with clouds. Requirement: Extremely high image quality, with a soft glow. . anime style, key visual, vibrant, studio anime,  highly detailed",
+    "sub_dir": "test",
+    "task_id": "222",
+    "batch_size": 4,
+    "guidance_scale": 4,
+    "negative_prompt": "photo, deformed, black and white, realism, disfigured, low contrast"
   },
   "launch": {
-    "device_index": 4
+    "device_index": 3
   }
 }
 
@@ -55,6 +55,8 @@ Authorization: {{auth}}
 
 {
   "task": {
+    "task_id": "44",
+    "sub_dir": "test",
     "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
     "prompt": "a cup of tea",
     "negative_prompt": "",
@@ -82,20 +84,48 @@ Authorization: {{auth}}
 
 {
   "task": {
-    "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
-    "prompt": "a cup of tea",
+    "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/a36ryJ5UhCVuvVEM/1709093025-0.png",
+    "prompt": "1girl, valley",
     "negative_prompt": "",
     "seed": 0,
-    "width": 800,
+    "width": 1024,
     "height": 1024,
-    "batch_size": 2,
+    "batch_size": 1,
     "steps": 20,
     "guidance_scale": 4.0,
     "steps2": 10,
     "guidance_scale2": 1.1
   },
   "launch": {
-    "device_index": 2
+    "device_index": 4
+  }
+}
+
+
+### img_gen ...
+
+POST {{base}}/task/img_gen
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "task_type": "inpaint",
+    "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/KzObvl9DxBhm0IDb/1709099669-1.png",
+    "prompt": "a green pole on the side of a dirt road, a sign on top of it, with red Word \"danger\"",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 1,
+    "steps": 20,
+    "guidance_scale": 4.0,
+    "steps2": 10,
+    "guidance_scale2": 1.1
+  },
+  "launch": {
+    "device_index": 4
   }
 }
 

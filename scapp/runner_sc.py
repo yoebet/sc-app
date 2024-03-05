@@ -20,6 +20,7 @@ class RunnerSc(RunnerBase):
         self.ip_models_loaded = False
         self.cn_core = None
         self.cn_models = None
+        self.cn_extras = None
 
     def load_models(self):
         # SETUP STAGE C
@@ -80,6 +81,7 @@ class RunnerSc(RunnerBase):
 
         self.cn_core = core
         self.cn_models = models
+        self.cn_extras = extras
 
     def _inference(self,
                    task_id: str,
@@ -115,13 +117,14 @@ class RunnerSc(RunnerBase):
             self.ensure_ip_models()
             core = self.cn_core
             models = self.cn_models
+            extras = self.cn_extras
             use_cnet = True
         else:
             core = self.core
             models = self.models
+            extras = self.extras
             use_cnet = False
         core_b = self.core_b
-        extras = self.extras
         extras_b = self.extras_b
         models_b = self.models_b
 
@@ -136,7 +139,7 @@ class RunnerSc(RunnerBase):
             batch['images'] = images
 
             if task_type in ['inpaint', 'outpaint'] and mask is not None:
-                mask = prepare_image_tensor(mask)
+                mask = prepare_image_tensor(mask).to(self.device)
 
         noise_level = 1
         noised = None
@@ -149,7 +152,7 @@ class RunnerSc(RunnerBase):
         # Stage C Parameters
         extras.sampling_configs['cfg'] = prior_guidance_scale
         extras.sampling_configs['shift'] = 2
-        extras.sampling_configs['timesteps'] = int(decoder_num_inference_steps * noise_level)
+        extras.sampling_configs['timesteps'] = int(prior_num_inference_steps * noise_level)
         extras.sampling_configs['t_start'] = noise_level
         extras.sampling_configs['x_init'] = noised
 
@@ -174,10 +177,13 @@ class RunnerSc(RunnerBase):
             outpaint = task_type == 'outpaint'
             cnet_multiplier = 1.0  # 0.8, 0.3
             threshold = 0.2
-            cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint, threshold=threshold)
-            cnet_uncond = cnet
-            conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
-            unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]
+
+            with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
+                cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint,
+                                                 threshold=threshold)
+                cnet_uncond = cnet
+                conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
+                unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]
 
         with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
             torch.manual_seed(seed)
@@ -186,11 +192,13 @@ class RunnerSc(RunnerBase):
                 models.generator, conditions, stage_c_latent_shape,
                 unconditions, device=self.device, **extras.sampling_configs,
             )
+            # st = 0
             for (sampled_c, _, _) in tqdm(sampling_c, total=extras.sampling_configs['timesteps']):
                 sampled_c = sampled_c
-
-            # preview_c = models.previewer(sampled_c).float()
-            # show_images(preview_c)
+                # st += 1
+                # preview_c = models.previewer(sampled_c).float()
+                # pi = show_images(preview_c)
+                # pi.save(f'{task_type}_preview_{st}.png')
 
             conditions_b['effnet'] = sampled_c
             unconditions_b['effnet'] = torch.zeros_like(sampled_c)

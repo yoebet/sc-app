@@ -55,15 +55,32 @@ def check_device_mem(device_index):
     })
 
 
-def _build_txt2img_params(params):
+def _gen_images(task_type=None):
+    req = request.get_json()
+    logger.info(pformat(req))
+    params = req.get('task')
+    launch_params = req.get('launch')
+    if launch_params is None:
+        launch_params = {}
+
+    fn_name = task_type
+    if task_type is None:
+        task_type = params.get('task_type')
+        fn_name = 'img_gen'
+    else:
+        params['task_type'] = task_type
+
     task_id = params.get('task_id')
     if task_id is None:
         task_id = str(int(time.time()))
-    return {
+    task_params = {
+        'task_type': params.get('task_type', None),
         'task_id': task_id,
         'sub_dir': params.get('sub_dir', None),
         'prompt': params.get('prompt', None),
         'negative_prompt': params.get('negative_prompt', ''),
+        'image': params.get('image', None),
+        'mask': params.get('mask', None),
         'seed': params.get('seed', 0),
         'width': params.get('width', 1024),
         'height': params.get('height', 1024),
@@ -75,22 +92,8 @@ def _build_txt2img_params(params):
         # 'return_images_format': 'base64',
     }
 
-
-def _gen_images(task_type=None):
-    req = request.get_json()
-    logger.info(pformat(req))
-    params = req.get('task')
-    launch_params = req.get('launch')
-    if launch_params is None:
-        launch_params = {}
-    if task_type is None:
-        task_type = req.get('task_type')
-    task_params = _build_txt2img_params(params)
-    if task_type == 'img2img' or task_type == 'img_variate':
-        task_params['image'] = params.get('image')
-
     try:
-        fn = getattr(task_executor, task_type)
+        fn = getattr(task_executor, fn_name)
         result = fn(task_params, launch_params)
     except Exception as e:
         traceback.print_exc()
@@ -120,7 +123,7 @@ def img_variate():
 
 
 @app.route('/task/img_gen', methods=('POST',))
-def img_variate():
+def img_gen():
     return _gen_images()
 
 
