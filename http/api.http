@@ -102,7 +102,7 @@ Authorization: {{auth}}
 }
 
 
-### img_gen ...
+### inpaint
 
 POST {{base}}/task/img_gen
 Content-Type: application/json
@@ -119,6 +119,35 @@ Authorization: {{auth}}
     "width": 1024,
     "height": 1024,
     "batch_size": 1,
+    "steps": 20,
+    "guidance_scale": 4.0,
+    "steps2": 10,
+    "guidance_scale2": 1.1
+  },
+  "launch": {
+    "device_index": 4
+  }
+}
+
+
+### inpoutpaintaint
+
+POST {{base}}/task/img_gen
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task": {
+    "task_type": "outpaint",
+    "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/KzObvl9DxBhm0IDb/1709099669-1.png",
+    "prompt": "a green pole on the side of a dirt road, a sign on top of it, with red Word \"danger\"",
+    "negative_prompt": "",
+    "seed": 0,
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 1,
+    "outpaint_ext": [128],
     "steps": 20,
     "guidance_scale": 4.0,
     "steps2": 10,

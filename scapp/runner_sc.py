@@ -1,8 +1,11 @@
+import torch
+import torchvision.transforms.functional as F
 import logging
 import random
 import yaml
 from tqdm import tqdm
-from inference.utils import *
+from PIL import Image
+from inference.utils import to_pil_images, calculate_latent_sizes
 from train import WurstCoreC, WurstCoreB, ControlNetCore
 from .runner_base import RunnerBase, MAX_SEED
 from .common import prepare_image_tensor
@@ -93,6 +96,8 @@ class RunnerSc(RunnerBase):
                    batch_size: int = 2,
                    image=None,
                    mask=None,
+                   mask_invert=False,
+                   outpaint_ext=None,  # [top, right, bottom, left]
                    prior_num_inference_steps: int = 20,
                    prior_guidance_scale: float = 4.0,
                    decoder_num_inference_steps: int = 10,
@@ -107,7 +112,6 @@ class RunnerSc(RunnerBase):
             height = 1024
         caption = prompt
         neg_caption = negative_prompt if negative_prompt is not None else ""
-        stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
         if decoder_guidance_scale < 0.5:
             decoder_guidance_scale = 0.5
         if decoder_guidance_scale == 7:
@@ -130,6 +134,8 @@ class RunnerSc(RunnerBase):
 
         # PREPARE CONDITIONS
         batch = {'captions': [caption] * batch_size, 'neg_captions': [neg_caption] * batch_size}
+
+        images = None
         if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             # _, h, w = tensor_image.shape
@@ -138,8 +144,43 @@ class RunnerSc(RunnerBase):
             images = tensor_image.unsqueeze(0).expand(batch_size, -1, -1, -1).to(self.device)
             batch['images'] = images
 
-            if task_type in ['inpaint', 'outpaint'] and mask is not None:
+            if task_type in ['inpaint'] and mask is not None:
                 mask = prepare_image_tensor(mask).to(self.device)
+
+        if task_type == 'outpaint':
+            image_ori = images[0]
+            img_height = image_ori.size(1)
+            img_width = image_ori.size(2)
+            if outpaint_ext is None:
+                outpaint_ext = [64]
+            if len(outpaint_ext) == 1:
+                outpaint_ext = outpaint_ext * 4
+            elif len(outpaint_ext) == 2:
+                outpaint_ext = outpaint_ext * 2
+            elif len(outpaint_ext) == 3:
+                outpaint_ext = outpaint_ext + [outpaint_ext[1]]
+            elif len(outpaint_ext) > 4:
+                outpaint_ext = outpaint_ext[0: 4]
+            ext_top, ext_right, ext_bottom, ext_left = outpaint_ext
+
+            full_height = img_height + ext_top + ext_bottom
+            full_width = img_width + ext_left + ext_right
+
+            mask_keep = torch.zeros(batch_size, 1, img_height, img_width).bool()
+            mask_left = torch.ones(batch_size, 1, img_height, ext_left).bool()
+            mask_right = torch.ones(batch_size, 1, img_height, ext_right).bool()
+            mask_m = torch.cat([mask_left, mask_keep, mask_right], 3)
+            mask_top = torch.ones(batch_size, 1, ext_top, full_width).bool()
+            mask_bottom = torch.ones(batch_size, 1, ext_bottom, full_width).bool()
+            mask = torch.cat([mask_top, mask_m, mask_bottom], 2)
+
+            pil_image = Image.new('RGB', size=(full_width, full_height))
+            pil_image.paste(F.to_pil_image(image_ori.clamp(0, 1)), box=(ext_left, ext_top))
+            image = pil_image.convert('RGB')
+            images = F.to_tensor(image).unsqueeze(0).to(self.device)
+            batch['images'] = images
+
+            height, width = full_height, full_width
 
         noise_level = 1
         noised = None
@@ -148,6 +189,8 @@ class RunnerSc(RunnerBase):
             effnet_latents = core.encode_latents(batch, models, extras)
             t = torch.ones(effnet_latents.size(0), device=self.device) * noise_level
             noised = extras.gdf.diffuse(effnet_latents, t=t)[0]
+
+        stage_c_latent_shape, stage_b_latent_shape = calculate_latent_sizes(height, width, batch_size=batch_size)
 
         # Stage C Parameters
         extras.sampling_configs['cfg'] = prior_guidance_scale
@@ -174,7 +217,7 @@ class RunnerSc(RunnerBase):
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
 
         if use_cnet:
-            outpaint = task_type == 'outpaint'
+            outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
             cnet_multiplier = 1.0  # 0.8, 0.3
             threshold = 0.2
 
