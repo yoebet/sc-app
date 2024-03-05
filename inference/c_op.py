@@ -7,7 +7,7 @@ from PIL import Image
 from inference.utils import *
 from train import ControlNetCore, WurstCoreB
 
-device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
 print(device)
 
 # SETUP STAGE C
@@ -108,14 +108,14 @@ noised = extras.gdf.diffuse(effnet_latents, t=t)[0]
 # Stage C Parameters
 extras.sampling_configs['cfg'] = 4
 extras.sampling_configs['shift'] = 2
-extras.sampling_configs['timesteps'] = int(20 * noise_level)
+extras.sampling_configs['timesteps'] = int(40 * noise_level)
 extras.sampling_configs['t_start'] = noise_level
 extras.sampling_configs['x_init'] = noised
 
 # Stage B Parameters
 extras_b.sampling_configs['cfg'] = 1.1
 extras_b.sampling_configs['shift'] = 1
-extras_b.sampling_configs['timesteps'] = 10
+extras_b.sampling_configs['timesteps'] = 20
 extras_b.sampling_configs['t_start'] = 1.0
 
 # PREPARE CONDITIONS
@@ -158,4 +158,4 @@ with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
         sampled_b = sampled_b
     sampled = models_b.stage_a.decode(sampled_b).float()
 
-show_images(sampled, return_images=True).save('sampled-op-4.png')
+show_images(sampled, return_images=True).save('sampled-op-6.png')

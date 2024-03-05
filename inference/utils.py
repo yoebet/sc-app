@@ -80,13 +80,16 @@ def pils_to_base64(images):
 
 
 def calculate_latent_sizes(height=1024, width=1024, batch_size=4, compression_factor_b=42.67, compression_factor_a=4.0):
-    resolution_multiple = 42.67
     latent_height = ceil(height / compression_factor_b)
     latent_width = ceil(width / compression_factor_b)
-    stage_c_latent_shape = (batch_size, 16, latent_height, latent_width)
+
+    def even(n):
+        return n - n % 2
+
+    stage_c_latent_shape = (batch_size, 16, even(latent_height), even(latent_width))
 
     latent_height = ceil(height / compression_factor_a)
     latent_width = ceil(width / compression_factor_a)
-    stage_b_latent_shape = (batch_size, 4, latent_height, latent_width)
+    stage_b_latent_shape = (batch_size, 4, even(latent_height), even(latent_width))
 
     return stage_c_latent_shape, stage_b_latent_shape

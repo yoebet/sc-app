@@ -142,7 +142,6 @@ class RunnerSc(RunnerBase):
             # size = 1024 if h >= 1024 or w >= 1024 else 768
             # tensor_image = F.resize(tensor_image, size, antialias=True)
             images = tensor_image.unsqueeze(0).expand(batch_size, -1, -1, -1).to(self.device)
-            batch['images'] = images
 
             if task_type in ['inpaint'] and mask is not None:
                 mask = prepare_image_tensor(mask).to(self.device)
@@ -178,14 +177,17 @@ class RunnerSc(RunnerBase):
             pil_image.paste(F.to_pil_image(image_ori.clamp(0, 1)), box=(ext_left, ext_top))
             image = pil_image.convert('RGB')
             images = F.to_tensor(image).unsqueeze(0).to(self.device)
-            batch['images'] = images
 
             height, width = full_height, full_width
+
+        if images is not None:
+            batch['images'] = images
 
         noise_level = 1
         noised = None
         if task_type in ['img2img', 'inpaint', 'outpaint']:
-            noise_level = 0.8
+            if task_type == 'img2img':
+                noise_level = 0.8
             effnet_latents = core.encode_latents(batch, models, extras)
             t = torch.ones(effnet_latents.size(0), device=self.device) * noise_level
             noised = extras.gdf.diffuse(effnet_latents, t=t)[0]
@@ -219,7 +221,7 @@ class RunnerSc(RunnerBase):
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
             cnet_multiplier = 1.0  # 0.8, 0.3
-            threshold = 0.2
+            threshold = 0.2 # 0.0 ~ 0.4
 
             with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint,
