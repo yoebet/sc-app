@@ -29,7 +29,7 @@ def downscale_images(images, factor=3 / 4):
     return scaled_image
 
 
-def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
+def show_images(images, rows=None, cols=None, return_images=True, **kwargs):
     if images.size(1) == 1:
         images = images.repeat(1, 3, 1, 1)
     elif images.size(1) > 3:

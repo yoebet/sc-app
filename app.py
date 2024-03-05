@@ -76,14 +76,15 @@ def _build_txt2img_params(params):
     }
 
 
-def _gen_images(task_type):
+def _gen_images(task_type=None):
     req = request.get_json()
     logger.info(pformat(req))
     params = req.get('task')
     launch_params = req.get('launch')
     if launch_params is None:
         launch_params = {}
-
+    if task_type is None:
+        task_type = req.get('task_type')
     task_params = _build_txt2img_params(params)
     if task_type == 'img2img' or task_type == 'img_variate':
         task_params['image'] = params.get('image')
@@ -116,6 +117,11 @@ def img2img():
 @app.route('/task/img_variate', methods=('POST',))
 def img_variate():
     return _gen_images('img_variate')
+
+
+@app.route('/task/img_gen', methods=('POST',))
+def img_variate():
+    return _gen_images()
 
 
 def get():

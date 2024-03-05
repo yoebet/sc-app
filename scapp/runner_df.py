@@ -22,6 +22,7 @@ class RunnerDf(RunnerBase):
         decoder = StableCascadeDecoderPipeline.from_pretrained("stabilityai/stable-cascade", torch_dtype=torch.half)
         self.prior = prior.to(self.device)
         self.decoder = decoder.to(self.device)
+        self.models_loaded = True
 
     def _generate_prior(self, prompt, negative_prompt, image,
                         generator, width, height, num_inference_steps, guidance_scale, num_images_per_prompt):

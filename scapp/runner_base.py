@@ -34,6 +34,9 @@ class RunnerBase:
     def _img_variate(self, **params):
         ...
 
+    def _img_gen(self, **params):
+        ...
+
     def get_task_dir(self, task_id: str, task_type: str, sub_dir):
         if sub_dir is None:
             sub_dir = task_type
@@ -57,7 +60,6 @@ class RunnerBase:
                                 'error_message': 'device occupied',
                             }
                     self.load_models()
-                    self.models_loaded = True
 
                 task_id = kwargs.get('task_id')
                 sub_dir = kwargs.get('sub_dir')
@@ -123,3 +125,6 @@ class RunnerBase:
 
     def img_variate(self, **params):
         return self._run(self._img_variate, params=params)
+
+    def img_gen(self, **params):
+        return self._run(self._img_gen, params=params)

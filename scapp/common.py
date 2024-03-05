@@ -7,6 +7,7 @@ import requests
 from PIL import Image
 from urllib.parse import urlparse
 import torch
+import torchvision.transforms.functional as F
 
 
 def trans_unit(bytes, unit):
@@ -101,3 +102,13 @@ def decode_to_pil_images(encoded_images):
         image = decode_to_pil_image(encoded)
         images.append(image)
     return images
+
+
+def prepare_image_tensor(image):
+    if isinstance(image, str):
+        if image.startswith('http'):
+            image = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+        else:
+            image = decode_to_pil_image(image)
+
+    return F.to_tensor(image)

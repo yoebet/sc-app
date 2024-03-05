@@ -3,9 +3,9 @@ import random
 import yaml
 from tqdm import tqdm
 from inference.utils import *
-from train import WurstCoreC, WurstCoreB
+from train import WurstCoreC, WurstCoreB, ControlNetCore
 from .runner_base import RunnerBase, MAX_SEED
-from .common import decode_to_pil_image
+from .common import prepare_image_tensor
 
 
 class RunnerSc(RunnerBase):
@@ -17,6 +17,9 @@ class RunnerSc(RunnerBase):
         self.extras_b = None
         self.models = None
         self.models_b = None
+        self.ip_models_loaded = False
+        self.cn_core = None
+        self.cn_models = None
 
     def load_models(self):
         # SETUP STAGE C
@@ -47,20 +50,36 @@ class RunnerSc(RunnerBase):
         models_b.generator.bfloat16().eval().requires_grad_(False)
         print("STAGE B READY")
 
-        # models = WurstCoreC.Models(
-        #    **{**models.to_dict(), 'generator': torch.compile(models.generator, mode="reduce-overhead", fullgraph=True)}
-        # )
-        #
-        # models_b = WurstCoreB.Models(
-        #    **{**models_b.to_dict(), 'generator': torch.compile(models_b.generator, mode="reduce-overhead", fullgraph=True)}
-        # )
-
         self.core = core
         self.core_b = core_b
         self.extras = extras
         self.extras_b = extras_b
         self.models = models
         self.models_b = models_b
+
+        self.models_loaded = True
+
+    def ensure_ip_models(self):
+        if self.cn_core is not None:
+            return
+
+        if not self.models_loaded:
+            self.load_models()
+
+        config_file = 'configs/inference/controlnet_c_3b_inpainting.yaml'
+        with open(config_file, "r", encoding="utf-8") as file:
+            loaded_config = yaml.safe_load(file)
+
+        core = ControlNetCore(config_dict=loaded_config, device=self.device, training=False)
+
+        extras = core.setup_extras_pre()
+
+        models = core.setup_models(extras, shared=vars(self.models))
+        models.generator.eval().requires_grad_(False)
+        print("CONTROLNET READY")
+
+        self.cn_core = core
+        self.cn_models = models
 
     def _inference(self,
                    task_id: str,
@@ -71,11 +90,12 @@ class RunnerSc(RunnerBase):
                    height: int = 1024,
                    batch_size: int = 2,
                    image=None,
+                   mask=None,
                    prior_num_inference_steps: int = 20,
                    prior_guidance_scale: float = 4.0,
                    decoder_num_inference_steps: int = 10,
                    decoder_guidance_scale: float = 1.1,
-                   task_type='txt2img',  # img2img, img_variate
+                   task_type='txt2img',  # img2img, img_variate, inpaint, outpaint
                    return_images_format: str = 'base64',  # pil
                    sub_dir: str = None,
                    ):
@@ -91,19 +111,47 @@ class RunnerSc(RunnerBase):
         if decoder_guidance_scale == 7:
             decoder_guidance_scale = 4
 
-        core = self.core
+        if task_type in ['inpaint', 'outpaint']:
+            self.ensure_ip_models()
+            core = self.cn_core
+            models = self.cn_models
+            use_cnet = True
+        else:
+            core = self.core
+            models = self.models
+            use_cnet = False
         core_b = self.core_b
         extras = self.extras
         extras_b = self.extras_b
-        models = self.models
         models_b = self.models_b
+
+        # PREPARE CONDITIONS
+        batch = {'captions': [caption] * batch_size, 'neg_captions': [neg_caption] * batch_size}
+        if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
+            tensor_image = prepare_image_tensor(image)
+            # _, h, w = tensor_image.shape
+            # size = 1024 if h >= 1024 or w >= 1024 else 768
+            # tensor_image = F.resize(tensor_image, size, antialias=True)
+            images = tensor_image.unsqueeze(0).expand(batch_size, -1, -1, -1).to(self.device)
+            batch['images'] = images
+
+            if task_type in ['inpaint', 'outpaint'] and mask is not None:
+                mask = prepare_image_tensor(mask)
+
+        noise_level = 1
+        noised = None
+        if task_type in ['img2img', 'inpaint', 'outpaint']:
+            noise_level = 0.8
+            effnet_latents = core.encode_latents(batch, models, extras)
+            t = torch.ones(effnet_latents.size(0), device=self.device) * noise_level
+            noised = extras.gdf.diffuse(effnet_latents, t=t)[0]
 
         # Stage C Parameters
         extras.sampling_configs['cfg'] = prior_guidance_scale
         extras.sampling_configs['shift'] = 2
-        extras.sampling_configs['timesteps'] = prior_num_inference_steps
-        extras.sampling_configs['t_start'] = 1.0
-        extras.sampling_configs['x_init'] = None
+        extras.sampling_configs['timesteps'] = int(decoder_num_inference_steps * noise_level)
+        extras.sampling_configs['t_start'] = noise_level
+        extras.sampling_configs['x_init'] = noised
 
         # Stage B Parameters
         extras_b.sampling_configs['cfg'] = decoder_guidance_scale
@@ -114,27 +162,6 @@ class RunnerSc(RunnerBase):
             seed = random.randint(0, MAX_SEED)
             print("seed:", seed)
 
-        # PREPARE CONDITIONS
-        batch = {'captions': [caption] * batch_size, 'neg_captions': [neg_caption] * batch_size}
-        if task_type == 'img2img' or task_type == 'img_variate':
-            if isinstance(image, str):
-                if image.startswith('http'):
-                    image = download_image(image)
-                else:
-                    image = decode_to_pil_image(image)
-            images = resize_image(image).unsqueeze(0).expand(batch_size, -1, -1, -1).to(self.device)
-            batch['images'] = images
-
-        if task_type == 'img2img':
-            noise_level = 0.8
-            effnet_latents = core.encode_latents(batch, models, extras)
-            t = torch.ones(effnet_latents.size(0), device=self.device) * noise_level
-            noised = extras.gdf.diffuse(effnet_latents, t=t)[0]
-
-            extras.sampling_configs['timesteps'] = int(decoder_num_inference_steps * noise_level)
-            extras.sampling_configs['t_start'] = noise_level
-            extras.sampling_configs['x_init'] = noised
-
         eval_image_embeds = task_type == 'img_variate'
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
@@ -142,6 +169,15 @@ class RunnerSc(RunnerBase):
                                            eval_image_embeds=False)
         conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
+
+        if use_cnet:
+            outpaint = task_type == 'outpaint'
+            cnet_multiplier = 1.0  # 0.8, 0.3
+            threshold = 0.2
+            cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint, threshold=threshold)
+            cnet_uncond = cnet
+            conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
+            unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]
 
         with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
             torch.manual_seed(seed)
@@ -183,4 +219,7 @@ class RunnerSc(RunnerBase):
         return self._inference(**params)
 
     def _img_variate(self, **params):
+        return self._inference(**params)
+
+    def _img_gen(self, **params):
         return self._inference(**params)
