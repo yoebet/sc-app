@@ -93,10 +93,11 @@ class RunnerSc(RunnerBase):
                    seed: int = 0,
                    width: int = 1024,
                    height: int = 1024,
-                   batch_size: int = 2,
+                   batch_size: int = 1,
                    image=None,
                    mask=None,
                    mask_invert=False,
+                   auto_mask_threshold=0.2,
                    outpaint_ext=None,  # [top, right, bottom, left]
                    prior_num_inference_steps: int = 20,
                    prior_guidance_scale: float = 4.0,
@@ -116,6 +117,11 @@ class RunnerSc(RunnerBase):
             decoder_guidance_scale = 0.5
         if decoder_guidance_scale == 7:
             decoder_guidance_scale = 4
+        generated_seed = False
+        if seed <= 0:
+            seed = random.randint(0, MAX_SEED)
+            generated_seed = True
+            print("seed:", seed)
 
         if task_type in ['inpaint', 'outpaint']:
             self.ensure_ip_models()
@@ -135,23 +141,25 @@ class RunnerSc(RunnerBase):
         # PREPARE CONDITIONS
         batch = {'captions': [caption] * batch_size, 'neg_captions': [neg_caption] * batch_size}
 
-        images = None
+        image0 = None
+        padded_image = None
         if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             # _, h, w = tensor_image.shape
             # size = 1024 if h >= 1024 or w >= 1024 else 768
             # tensor_image = F.resize(tensor_image, size, antialias=True)
-            images = tensor_image.unsqueeze(0).expand(batch_size, -1, -1, -1).to(self.device)
+            image0 = tensor_image.to(self.device)
 
             if task_type in ['inpaint'] and mask is not None:
                 mask = prepare_image_tensor(mask).to(self.device)
 
         if task_type == 'outpaint':
-            image_ori = images[0]
-            img_height = image_ori.size(1)
-            img_width = image_ori.size(2)
+            img_height = image0.size(1)
+            img_width = image0.size(2)
             if outpaint_ext is None:
                 outpaint_ext = [64]
+            elif type(outpaint_ext) == int:
+                outpaint_ext = [outpaint_ext]
             if len(outpaint_ext) == 1:
                 outpaint_ext = outpaint_ext * 4
             elif len(outpaint_ext) == 2:
@@ -165,23 +173,25 @@ class RunnerSc(RunnerBase):
             full_height = img_height + ext_top + ext_bottom
             full_width = img_width + ext_left + ext_right
 
+            mask = torch.ones(batch_size, 1, full_height, full_width).bool()
             mask_keep = torch.zeros(batch_size, 1, img_height, img_width).bool()
-            mask_left = torch.ones(batch_size, 1, img_height, ext_left).bool()
-            mask_right = torch.ones(batch_size, 1, img_height, ext_right).bool()
-            mask_m = torch.cat([mask_left, mask_keep, mask_right], 3)
-            mask_top = torch.ones(batch_size, 1, ext_top, full_width).bool()
-            mask_bottom = torch.ones(batch_size, 1, ext_bottom, full_width).bool()
-            mask = torch.cat([mask_top, mask_m, mask_bottom], 2)
+            mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
+            mask.to(self.device)
 
-            pil_image = Image.new('RGB', size=(full_width, full_height))
-            pil_image.paste(F.to_pil_image(image_ori.clamp(0, 1)), box=(ext_left, ext_top))
-            image = pil_image.convert('RGB')
-            images = F.to_tensor(image).unsqueeze(0).to(self.device)
+            paddings = (ext_left, ext_right, ext_top, ext_bottom)
+            padded_image = torch.nn.ReflectionPad2d(paddings)(image0)
+            # padded_image = torch.randn((3, full_height, full_width))
+            # padded_image[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
 
             height, width = full_height, full_width
 
-        if images is not None:
-            batch['images'] = images
+        if image0 is not None:
+            images = image0.expand(batch_size, -1, -1, -1)
+            batch['images'] = images.to(self.device)
+            if padded_image is not None:
+                batch['images_ori'] = batch['images']
+                padded_images = padded_image.expand(batch_size, -1, -1, -1)
+                batch['images'] = padded_images.to(self.device)
 
         noise_level = 1
         noised = None
@@ -206,11 +216,9 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['shift'] = 1
         extras_b.sampling_configs['timesteps'] = decoder_num_inference_steps
         extras_b.sampling_configs['t_start'] = 1.0
-        if seed <= 0:
-            seed = random.randint(0, MAX_SEED)
-            print("seed:", seed)
 
-        eval_image_embeds = task_type == 'img_variate'
+        eval_image_embeds = task_type in ['img_variate', 'outpaint'] or (
+                    image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
         unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
@@ -221,11 +229,12 @@ class RunnerSc(RunnerBase):
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
             cnet_multiplier = 1.0  # 0.8, 0.3
-            threshold = 0.2 # 0.0 ~ 0.4
+            if auto_mask_threshold is None:
+                auto_mask_threshold = 0.2  # 0.0 ~ 0.4
 
             with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint,
-                                                 threshold=threshold)
+                                                 threshold=auto_mask_threshold)
                 cnet_uncond = cnet
                 conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
                 unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]
@@ -258,12 +267,15 @@ class RunnerSc(RunnerBase):
 
         images = to_pil_images(sampled)
 
-        return self.build_results(task_type,
-                                  images,
-                                  task_id,
-                                  sub_dir=sub_dir,
-                                  file_name_part=f'{width}x{height}',
-                                  return_images_format=return_images_format)
+        result = self.build_results(task_type,
+                                    images,
+                                    task_id,
+                                    sub_dir=sub_dir,
+                                    file_name_part=f'{width}x{height}',
+                                    return_images_format=return_images_format)
+        if generated_seed:
+            result['seed'] = seed
+        return result
 
     def _txt2img(self, **params):
         return self._inference(**params)

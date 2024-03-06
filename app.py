@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 app.config.from_mapping(dotenv_values())
 app.config.from_mapping(dotenv_values('.env.local'))
-device_index = os.environ['DEVICE_INDEX']
+device_index = os.environ.get('DEVICE_INDEX')
 if device_index is not None and device_index != '':
     app.config.update(device_index=int(device_index))
 
@@ -70,29 +70,38 @@ def _gen_images(task_type=None):
     else:
         params['task_type'] = task_type
 
+    generated_task_id = False
     task_id = params.get('task_id')
     if task_id is None:
         task_id = str(int(time.time()))
+        generated_task_id = True
     task_params = {
-        'task_type': params.get('task_type', None),
+        'task_type': task_type,
         'task_id': task_id,
         'sub_dir': params.get('sub_dir', None),
         'prompt': params.get('prompt', None),
         'negative_prompt': params.get('negative_prompt', ''),
-        'image': params.get('image', None),
-        'mask': params.get('mask', None),
-        'mask_invert': params.get('mask_invert', False),
         'seed': params.get('seed', 0),
         'width': params.get('width', 1024),
         'height': params.get('height', 1024),
         'batch_size': params.get('batch_size', 1),
-        'outpaint_ext': params.get('outpaint_ext', [64]),
         'prior_num_inference_steps': params.get('steps', 20),
         'prior_guidance_scale': params.get('guidance_scale', 4.0),
         'decoder_num_inference_steps': params.get('steps2', 10),
         'decoder_guidance_scale': params.get('guidance_scale2', 1.1),
         # 'return_images_format': 'base64',
     }
+    if task_type != 'txt2img':
+        task_params['image'] = params.get('image', None)
+    if task_type == 'inpaint':
+        task_params = {
+            **task_params,
+            'mask': params.get('mask', None),
+            'mask_invert': params.get('mask_invert', False),
+            'auto_mask_threshold': params.get('auto_mask_threshold', 0.2),
+        }
+    elif task_type == 'outpaint':
+        task_params['outpaint_ext'] = params.get('outpaint_ext', [64])
 
     try:
         fn = getattr(task_executor, fn_name)
@@ -106,6 +115,8 @@ def _gen_images(task_type=None):
             'error_message': str(e)
         })
 
+    if generated_task_id:
+        result['task_id'] = task_id
     return jsonify(result)
 
 
