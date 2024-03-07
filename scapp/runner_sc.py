@@ -137,6 +137,7 @@ class RunnerSc(RunnerBase):
         batch = {'captions': [caption] * batch_size, 'neg_captions': [neg_caption] * batch_size}
 
         image0 = None
+        padded_image = None
         if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             # _, h, w = tensor_image.shape
@@ -172,16 +173,19 @@ class RunnerSc(RunnerBase):
             mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
             mask.to(self.device)
 
-            padded = torch.nn.ReflectionPad2d(outpaint_ext)(image0)
-            # padded = torch.randn((3, full_height, full_width))
-            # padded[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
-            image0 = padded
+            padded_image = torch.nn.ReflectionPad2d(outpaint_ext)(image0)
+            # padded_image = torch.randn((3, full_height, full_width))
+            # padded_image[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
 
             height, width = full_height, full_width
 
         if image0 is not None:
             images = image0.expand(batch_size, -1, -1, -1)
             batch['images'] = images.to(self.device)
+            if padded_image is not None:
+                batch['images_ori'] = batch['images']
+                padded_images = padded_image.expand(batch_size, -1, -1, -1)
+                batch['images'] = padded_images.to(self.device)
 
         noise_level = 1
         noised = None

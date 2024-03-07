@@ -141,6 +141,7 @@ class DataCore(WarpCore):
         captions = batch.get('captions')
         neg_captions = batch.get('neg_captions', None)
         images = batch.get('images', None)
+        images_ori = batch.get('images_ori', None)
         batch_size = len(captions)
 
         text_embeddings = None
@@ -166,16 +167,17 @@ class DataCore(WarpCore):
         image_embeddings = None
         if 'clip_img' in return_fields:
             image_embeddings = torch.zeros(batch_size, 768, device=self.device)
-            if images is not None:
-                images = images.to(self.device)
+            images_for_emb = images_ori if images_ori is not None else images
+            if images_for_emb is not None:
+                images_for_emb = images_for_emb.to(self.device)
                 if is_eval:
                     if not is_unconditional and eval_image_embeds:
-                        image_embeddings = models.image_model(extras.clip_preprocess(images)).image_embeds
+                        image_embeddings = models.image_model(extras.clip_preprocess(images_for_emb)).image_embeds
                 else:
                     rand_idx = np.random.rand(batch_size) > 0.9
                     if any(rand_idx):
                         image_embeddings[rand_idx] = models.image_model(
-                            extras.clip_preprocess(images[rand_idx])).image_embeds
+                            extras.clip_preprocess(images_for_emb[rand_idx])).image_embeds
             image_embeddings = image_embeddings.unsqueeze(1)
         return {
             'clip_text': text_embeddings,
