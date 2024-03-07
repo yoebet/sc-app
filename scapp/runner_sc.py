@@ -97,6 +97,7 @@ class RunnerSc(RunnerBase):
                    image=None,
                    mask=None,
                    mask_invert=False,
+                   auto_mask_threshold=0.2,
                    outpaint_ext=None,  # [top, right, bottom, left]
                    prior_num_inference_steps: int = 20,
                    prior_guidance_scale: float = 4.0,
@@ -151,6 +152,8 @@ class RunnerSc(RunnerBase):
             img_width = image0.size(2)
             if outpaint_ext is None:
                 outpaint_ext = [64]
+            elif type(outpaint_ext) == int:
+                outpaint_ext = [outpaint_ext]
             if len(outpaint_ext) == 1:
                 outpaint_ext = outpaint_ext * 4
             elif len(outpaint_ext) == 2:
@@ -218,11 +221,12 @@ class RunnerSc(RunnerBase):
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
             cnet_multiplier = 1.0  # 0.8, 0.3
-            threshold = 0.2  # 0.0 ~ 0.4
+            if auto_mask_threshold is None:
+                auto_mask_threshold = 0.2  # 0.0 ~ 0.4
 
             with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint,
-                                                 threshold=threshold)
+                                                 threshold=auto_mask_threshold)
                 cnet_uncond = cnet
                 conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
                 unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]

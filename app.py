@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 app.config.from_mapping(dotenv_values())
 app.config.from_mapping(dotenv_values('.env.local'))
-device_index = os.environ['DEVICE_INDEX']
+device_index = os.environ.get('DEVICE_INDEX')
 if device_index is not None and device_index != '':
     app.config.update(device_index=int(device_index))
 
@@ -82,6 +82,7 @@ def _gen_images(task_type=None):
         'image': params.get('image', None),
         'mask': params.get('mask', None),
         'mask_invert': params.get('mask_invert', False),
+        'auto_mask_threshold': params.get('auto_mask_threshold', 0.2),
         'seed': params.get('seed', 0),
         'width': params.get('width', 1024),
         'height': params.get('height', 1024),
