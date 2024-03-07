@@ -117,6 +117,11 @@ class RunnerSc(RunnerBase):
             decoder_guidance_scale = 0.5
         if decoder_guidance_scale == 7:
             decoder_guidance_scale = 4
+        generated_seed = False
+        if seed <= 0:
+            seed = random.randint(0, MAX_SEED)
+            generated_seed = True
+            print("seed:", seed)
 
         if task_type in ['inpaint', 'outpaint']:
             self.ensure_ip_models()
@@ -173,7 +178,8 @@ class RunnerSc(RunnerBase):
             mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
             mask.to(self.device)
 
-            padded_image = torch.nn.ReflectionPad2d(outpaint_ext)(image0)
+            paddings = (ext_left, ext_right, ext_top, ext_bottom)
+            padded_image = torch.nn.ReflectionPad2d(paddings)(image0)
             # padded_image = torch.randn((3, full_height, full_width))
             # padded_image[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
 
@@ -210,9 +216,6 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['shift'] = 1
         extras_b.sampling_configs['timesteps'] = decoder_num_inference_steps
         extras_b.sampling_configs['t_start'] = 1.0
-        if seed <= 0:
-            seed = random.randint(0, MAX_SEED)
-            print("seed:", seed)
 
         eval_image_embeds = task_type == 'img_variate' or (image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
@@ -263,12 +266,15 @@ class RunnerSc(RunnerBase):
 
         images = to_pil_images(sampled)
 
-        return self.build_results(task_type,
-                                  images,
-                                  task_id,
-                                  sub_dir=sub_dir,
-                                  file_name_part=f'{width}x{height}',
-                                  return_images_format=return_images_format)
+        result = self.build_results(task_type,
+                                    images,
+                                    task_id,
+                                    sub_dir=sub_dir,
+                                    file_name_part=f'{width}x{height}',
+                                    return_images_format=return_images_format)
+        if generated_seed:
+            result['seed'] = seed
+        return result
 
     def _txt2img(self, **params):
         return self._inference(**params)

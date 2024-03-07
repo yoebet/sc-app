@@ -70,9 +70,11 @@ def _gen_images(task_type=None):
     else:
         params['task_type'] = task_type
 
+    generated_task_id = False
     task_id = params.get('task_id')
     if task_id is None:
         task_id = str(int(time.time()))
+        generated_task_id = True
     task_params = {
         'task_type': task_type,
         'task_id': task_id,
@@ -113,6 +115,8 @@ def _gen_images(task_type=None):
             'error_message': str(e)
         })
 
+    if generated_task_id:
+        result['task_id'] = task_id
     return jsonify(result)
 
 
