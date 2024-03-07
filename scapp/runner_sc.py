@@ -172,10 +172,10 @@ class RunnerSc(RunnerBase):
             mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
             mask.to(self.device)
 
-            pil_image = Image.new('RGB', size=(full_width, full_height))
-            pil_image.paste(F.to_pil_image(torch.randn((3, full_height, full_width))))
-            pil_image.paste(F.to_pil_image(image0.clamp(0, 1)), box=(ext_left, ext_top))
-            image0 = F.to_tensor(pil_image.convert('RGB')).to(self.device)
+            padded = torch.nn.ReflectionPad2d(outpaint_ext)(image0)
+            # padded = torch.randn((3, full_height, full_width))
+            # padded[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
+            image0 = padded
 
             height, width = full_height, full_width
 
@@ -210,7 +210,7 @@ class RunnerSc(RunnerBase):
             seed = random.randint(0, MAX_SEED)
             print("seed:", seed)
 
-        eval_image_embeds = task_type == 'img_variate'
+        eval_image_embeds = task_type == 'img_variate' or (image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
         unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
