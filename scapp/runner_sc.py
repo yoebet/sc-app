@@ -217,7 +217,8 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['timesteps'] = decoder_num_inference_steps
         extras_b.sampling_configs['t_start'] = 1.0
 
-        eval_image_embeds = task_type == 'img_variate' or (image is not None and (prompt is None or prompt == ''))
+        eval_image_embeds = task_type in ['img_variate', 'outpaint'] or (
+                    image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
         unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
