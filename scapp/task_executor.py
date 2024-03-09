@@ -21,7 +21,7 @@ class TaskExecutor:
         self.runners_df = {}
 
     def get_runner(self, launch_params):
-        device_index = self.app_config['device_index']
+        device_index = self.app_config.get('device_index')
         if device_index is not None:
             device_name = f'cuda:{device_index}'
         else:
@@ -47,9 +47,9 @@ class TaskExecutor:
         runner = self.get_runner(launch_params)
         return runner.img2img(**task_params)
 
-    def img_variate(self, task_params, launch_params):
+    def variation(self, task_params, launch_params):
         runner = self.get_runner(launch_params)
-        return runner.img_variate(**task_params)
+        return runner.variation(**task_params)
 
     def img_gen(self, task_params, launch_params):
         runner = self.get_runner(launch_params)

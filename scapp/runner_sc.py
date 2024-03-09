@@ -23,7 +23,6 @@ class RunnerSc(RunnerBase):
         self.extras_b = None
         self.models = None
         self.models_b = None
-        self.ip_models_loaded = False
         self.cn_core = None
         self.cn_models = None
         self.cn_extras = None
@@ -109,7 +108,7 @@ class RunnerSc(RunnerBase):
                    prior_guidance_scale: float = 4.0,
                    decoder_num_inference_steps: int = 10,
                    decoder_guidance_scale: float = 1.1,
-                   task_type='txt2img',  # img2img, img_variate, inpaint, outpaint
+                   task_type='txt2img',  # img2img, variation, inpaint, outpaint
                    return_images_format: str = 'base64',  # pil
                    sub_dir: str = None,
                    ):
@@ -128,6 +127,8 @@ class RunnerSc(RunnerBase):
             seed = random.randint(0, MAX_SEED)
             generated_seed = True
             print("seed:", seed)
+
+        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
 
         if task_type in ['inpaint', 'outpaint']:
             self.ensure_ip_models()
@@ -149,15 +150,25 @@ class RunnerSc(RunnerBase):
 
         image0 = None
         padded_image = None
-        if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
+
+        def resize_save_image(tensor, name):
+            _, h, w = tensor.shape
+            if w != 1024 and h != 1024:
+                tensor = F.resize(tensor, size=800, max_size=1280, antialias=True)
+            input_file_pil = F.to_pil_image(tensor.clamp(0, 1))
+            input_file_pil.save(os.path.join(task_dir, f'{name}.png'))
+            return tensor
+
+        if task_type in ['img2img', 'variation', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             _, h, w = tensor_image.shape
-            if task_type == 'outpaint' and min(h, w) > 1400:
-                tensor_image = F.resize(tensor_image, 1400, antialias=True)
+            tensor_image = resize_save_image(tensor_image, 'input-image')
             image0 = tensor_image.to(self.device)
 
             if task_type in ['inpaint'] and mask is not None:
-                mask = prepare_image_tensor(mask).to(self.device)
+                mask = prepare_image_tensor(mask)
+                mask = resize_save_image(mask, 'input-mask')
+                mask.to(self.device)
 
         if task_type == 'outpaint':
             img_height = image0.size(1)
@@ -195,7 +206,7 @@ class RunnerSc(RunnerBase):
             images = image0.expand(batch_size, -1, -1, -1)
             batch['images'] = images.to(self.device)
             if padded_image is not None:
-                batch['images_ori'] = batch['images']
+                batch['images_before_pad'] = batch['images']
                 padded_images = padded_image.expand(batch_size, -1, -1, -1)
                 batch['images'] = padded_images.to(self.device)
 
@@ -223,7 +234,7 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['timesteps'] = decoder_num_inference_steps
         extras_b.sampling_configs['t_start'] = 1.0
 
-        eval_image_embeds = task_type in ['img_variate', 'outpaint'] or (
+        eval_image_embeds = task_type in ['variation', 'outpaint'] or (
                 image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
@@ -231,8 +242,6 @@ class RunnerSc(RunnerBase):
                                            eval_image_embeds=False)
         conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
-
-        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
 
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
@@ -281,8 +290,11 @@ class RunnerSc(RunnerBase):
                 models_b.generator, conditions_b, stage_b_latent_shape,
                 unconditions_b, device=self.device, **extras_b.sampling_configs
             )
+            st = 0
             for (sampled_b, _, _) in tqdm(sampling_b, total=extras_b.sampling_configs['timesteps']):
                 sampled_b = sampled_b
+                st += 1
+                self._prepare_preview(step=st, stage='b', **preview_params)
             sampled = models_b.stage_a.decode(sampled_b).float()
 
         images = to_pil_images(sampled)
@@ -295,14 +307,16 @@ class RunnerSc(RunnerBase):
             result['seed'] = seed
         return result
 
-    def _prepare_preview(self, previewer_model, sampled, start_ts: float,
+    def _prepare_preview(self, previewer_model, start_ts: float,
                          task_id: str, task_dir: str, stage: str, step: int,
+                         sampled=None,
                          total_steps_c: int = 20,
                          total_steps_b: int = 10,
                          enable_live_preview: bool = False,
                          live_preview_save: bool = False):
         if not enable_live_preview:
             return
+
         try:
             c2b = 2
             tw = total_steps_c * c2b + total_steps_b
@@ -311,20 +325,30 @@ class RunnerSc(RunnerBase):
             else:  # c
                 cw = step * c2b
             percent = int((cw / tw) * 100)
-            preview = previewer_model(sampled).float()
-            if self.live_preview is not None and self.live_preview.get('task_id') != task_id:
-                self.last_task_preview = self.live_preview
-            self.live_preview = {'task_id': task_id,
-                                 'preview_id': f'{stage}{step}',
-                                 'previews': preview,
-                                 'percent': percent
-                                 }
-            if live_preview_save:
-                ts = time.time()
-                elapse = int(ts - start_ts)
-                pil_imgs = to_pil_images(preview)
+            if percent == 100:
+                percent = 99
+
+            lp = {'task_id': task_id,
+                  'preview_id': f'{stage}{step}',
+                  'percent': percent
+                  }
+
+            if self.live_preview is not None:
+                if self.live_preview.get('task_id') == task_id:
+                    lp['previews'] = self.live_preview.get('previews')
+                else:
+                    self.last_task_preview = self.live_preview
+            self.live_preview = lp
+            if sampled is not None:
+                lp['previews'] = previewer_model(sampled).float()
+
+            previews = lp.get('previews')
+            if live_preview_save and previews is not None:
+                elapse = int(time.time() - start_ts)
+                pil_imgs = to_pil_images(previews)
                 for pi, pimg in enumerate(pil_imgs):
-                    pimg.save(os.path.join(task_dir, f'preview_t{elapse}_p{percent}_{stage}{step}-{pi}.png'))
+                    pimg.save(
+                        os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}-{pi}.png'))
         except Exception as e:
             traceback.print_exc()
 
@@ -334,7 +358,7 @@ class RunnerSc(RunnerBase):
     def _img2img(self, **params):
         return self._inference(**params)
 
-    def _img_variate(self, **params):
+    def _variation(self, **params):
         return self._inference(**params)
 
     def _img_gen(self, **params):
