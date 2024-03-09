@@ -112,3 +112,24 @@ def prepare_image_tensor(image):
             image = decode_to_pil_image(image)
 
     return F.to_tensor(image)
+
+
+def img_tensor_paste(a, b, x1, y1, channels=None):
+    assert len(a.shape) >= 3, f"Expected at least 3 dimensions for tensor 'a', got {len(a.shape)}"
+    assert len(b.shape) == 3 or len(b.shape) == 2, f"Expected [2 or 3] dimensions for tensor 'b', got {len(a.shape)}"
+
+    channels = channels if not channels is None else list(range(a.shape[-3]))
+    if len(b.shape) == 3:
+        assert a.shape[-3] == b.shape[-3] or len(channels) == b.shape[-3] or b.shape[
+            -3] == 1, "tensors a and b must have the same number of channels or 'b' 1."
+
+    _h, _w = b.shape[-2], b.shape[-1]
+    h = _h if y1 + _h < a.shape[-2] else a.shape[-2] - y1
+    w = _w if x1 + _w < a.shape[-1] else a.shape[-1] - x1
+
+    if len(b.shape) == 3 and a.shape[-3] == b.shape[-3]:
+        a[..., channels, y1:y1 + h, x1:x1 + w] = b[channels, :h, :w]
+    else:
+        a[..., channels, y1:y1 + h, x1:x1 + w] = b[..., :h, :w]
+
+    return a

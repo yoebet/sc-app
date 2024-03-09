@@ -140,6 +140,15 @@ def img_gen():
     return _gen_images()
 
 
+@app.route('/task/live_preview', methods=('POST',))
+def live_preview():
+    req = request.get_json()
+    task_id = req.get('task_id')
+    last_preview_id = req.get('last_preview_id', None)
+    result = task_executor.get_live_preview(task_id, last_preview_id)
+    return jsonify(result)
+
+
 def get():
     return app
 
