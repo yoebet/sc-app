@@ -160,3 +160,14 @@ Authorization: {{auth}}
   }
 }
 
+
+### live_preview
+
+POST {{base}}/task/live_preview
+Content-Type: application/json
+Accept: application/json
+Authorization: {{auth}}
+
+{
+  "task_id": "444"
+}
