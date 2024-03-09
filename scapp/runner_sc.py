@@ -29,6 +29,7 @@ class RunnerSc(RunnerBase):
         self.cn_extras = None
         # {task_id, preview_id, previews, pil_previews, base64_previews, percent}
         self.live_preview = None
+        self.last_task_preview = None
 
     def load_models(self):
         # SETUP STAGE C
@@ -246,17 +247,17 @@ class RunnerSc(RunnerBase):
                 conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
                 unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]
 
-        live_preview = self.app_config.get('LIVE_PREVIEW', None)
-        live_preview_save = self.app_config.get('LIVE_PREVIEW_SAVE', None)
-        live_preview = live_preview is not None and live_preview != ''
-        live_preview_save = live_preview_save is not None and live_preview_save != ''
+        conf_live_preview = self.app_config.get('LIVE_PREVIEW', None)
+        conf_live_preview_save = self.app_config.get('LIVE_PREVIEW_SAVE', None)
+        enable_live_preview = conf_live_preview is not None and conf_live_preview != ''
+        live_preview_save = conf_live_preview_save is not None and conf_live_preview_save != ''
         preview_params = {
             'previewer_model': models.previewer,
             'task_id': task_id, 'task_dir': task_dir,
             'start_ts': time.time(),
             'total_steps_c': prior_num_inference_steps,
             'total_steps_b': decoder_num_inference_steps,
-            'live_preview': live_preview,
+            'enable_live_preview': enable_live_preview,
             'live_preview_save': live_preview_save}
 
         with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
@@ -298,9 +299,9 @@ class RunnerSc(RunnerBase):
                          task_id: str, task_dir: str, stage: str, step: int,
                          total_steps_c: int = 20,
                          total_steps_b: int = 10,
-                         live_preview: bool = False,
+                         enable_live_preview: bool = False,
                          live_preview_save: bool = False):
-        if not live_preview:
+        if not enable_live_preview:
             return
         try:
             c2b = 2
@@ -311,6 +312,8 @@ class RunnerSc(RunnerBase):
                 cw = step * c2b
             percent = int((cw / tw) * 100)
             preview = previewer_model(sampled).float()
+            if self.live_preview is not None and self.live_preview.get('task_id') != task_id:
+                self.last_task_preview = self.live_preview
             self.live_preview = {'task_id': task_id,
                                  'preview_id': f'{stage}{step}',
                                  'previews': preview,
@@ -339,7 +342,11 @@ class RunnerSc(RunnerBase):
 
     def get_live_preview(self, task_id, last_preview_id):
         lp = self.live_preview
-        if lp is None or lp.get('task_id') != task_id or lp.get('preview_id') == last_preview_id:
+        if lp is None or lp.get('task_id') != task_id:
+            lp = self.last_task_preview
+        if lp is None or lp.get('task_id') != task_id:
+            return None
+        if lp.get('preview_id') == last_preview_id:
             return None
         if lp.get('base64_previews') is not None:
             return lp.get('base64_previews')
