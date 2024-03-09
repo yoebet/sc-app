@@ -59,4 +59,4 @@ class TaskExecutor:
         runner = self.get_runner({'runner': 'sc'})
         if runner is None:
             return None
-        return runner.live_preview(task_id, last_preview_id)
+        return runner.get_live_preview(task_id, last_preview_id)

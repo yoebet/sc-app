@@ -1,5 +1,6 @@
 import os
 import time
+import traceback
 
 import torch
 import torchvision.transforms.functional as F
@@ -279,11 +280,8 @@ class RunnerSc(RunnerBase):
                 models_b.generator, conditions_b, stage_b_latent_shape,
                 unconditions_b, device=self.device, **extras_b.sampling_configs
             )
-            st = 0
             for (sampled_b, _, _) in tqdm(sampling_b, total=extras_b.sampling_configs['timesteps']):
                 sampled_b = sampled_b
-                st += 1
-                self._prepare_preview(sampled=sampled_b, step=st, stage='b', **preview_params)
             sampled = models_b.stage_a.decode(sampled_b).float()
 
         images = to_pil_images(sampled)
@@ -302,26 +300,30 @@ class RunnerSc(RunnerBase):
                          total_steps_b: int = 10,
                          live_preview: bool = False,
                          live_preview_save: bool = False):
-        if live_preview:
+        if not live_preview:
+            return
+        try:
             c2b = 2
             tw = total_steps_c * c2b + total_steps_b
             if stage == 'b':
                 cw = total_steps_c * c2b + step
             else:  # c
                 cw = step * c2b
-            pexpect = int((cw / tw) * 100)
+            percent = int((cw / tw) * 100)
             preview = previewer_model(sampled).float()
             self.live_preview = {'task_id': task_id,
                                  'preview_id': f'{stage}{step}',
                                  'previews': preview,
-                                 'percent': pexpect
+                                 'percent': percent
                                  }
             if live_preview_save:
                 ts = time.time()
                 elapse = int(ts - start_ts)
                 pil_imgs = to_pil_images(preview)
                 for pi, pimg in enumerate(pil_imgs):
-                    pimg.save(os.path.join(task_dir, f'preview_{elapse}_{pexpect}_{stage}{step}-{pi}.png'))
+                    pimg.save(os.path.join(task_dir, f'preview_t{elapse}_p{percent}_{stage}{step}-{pi}.png'))
+        except Exception as e:
+            traceback.print_exc()
 
     def _txt2img(self, **params):
         return self._inference(**params)
