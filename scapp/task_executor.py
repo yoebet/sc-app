@@ -54,3 +54,9 @@ class TaskExecutor:
     def img_gen(self, task_params, launch_params):
         runner = self.get_runner(launch_params)
         return runner.img_gen(**task_params)
+
+    def get_live_preview(self, task_id, last_preview_id):
+        runner = self.get_runner({'runner': 'sc'})
+        if runner is None:
+            return None
+        return runner.live_preview(task_id, last_preview_id)

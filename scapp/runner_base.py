@@ -74,10 +74,8 @@ class RunnerBase:
         return f
 
     def build_results(self,
-                      task_type: str,
+                      task_dir: str,
                       pil_images,
-                      task_id: str,
-                      sub_dir: str = None,
                       file_name_part=None,
                       return_images_format: str = 'base64'):
         if pil_images is None:
@@ -85,7 +83,6 @@ class RunnerBase:
                 'success': False
             }
 
-        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
         for idx, img in enumerate(pil_images):
             file_base = f'output_{idx + 1}'
             if file_name_part is not None:

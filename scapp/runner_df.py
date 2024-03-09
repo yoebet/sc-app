@@ -116,9 +116,9 @@ class RunnerDf(RunnerBase):
             guidance_scale=0.0,
         )
 
-        return self.build_results(task_type,
+        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
+
+        return self.build_results(task_dir,
                                   images,
-                                  task_id,
-                                  sub_dir=sub_dir,
                                   file_name_part=f'{width}x{height}',
                                   return_images_format=return_images_format)

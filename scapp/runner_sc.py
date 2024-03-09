@@ -1,11 +1,13 @@
+import os
+import time
+
 import torch
 import torchvision.transforms.functional as F
 import logging
 import random
 import yaml
 from tqdm import tqdm
-from PIL import Image
-from inference.utils import to_pil_images, calculate_latent_sizes
+from inference.utils import to_pil_images, calculate_latent_sizes, to_base64_images
 from train import WurstCoreC, WurstCoreB, ControlNetCore
 from .runner_base import RunnerBase, MAX_SEED
 from .common import prepare_image_tensor
@@ -24,6 +26,8 @@ class RunnerSc(RunnerBase):
         self.cn_core = None
         self.cn_models = None
         self.cn_extras = None
+        # {task_id, preview_id, previews, pil_previews, base64_previews, percent}
+        self.live_preview = None
 
     def load_models(self):
         # SETUP STAGE C
@@ -145,9 +149,9 @@ class RunnerSc(RunnerBase):
         padded_image = None
         if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
-            # _, h, w = tensor_image.shape
-            # size = 1024 if h >= 1024 or w >= 1024 else 768
-            # tensor_image = F.resize(tensor_image, size, antialias=True)
+            _, h, w = tensor_image.shape
+            if task_type == 'outpaint' and min(h, w) > 1400:
+                tensor_image = F.resize(tensor_image, 1400, antialias=True)
             image0 = tensor_image.to(self.device)
 
             if task_type in ['inpaint'] and mask is not None:
@@ -218,13 +222,15 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['t_start'] = 1.0
 
         eval_image_embeds = task_type in ['img_variate', 'outpaint'] or (
-                    image is not None and (prompt is None or prompt == ''))
+                image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
         unconditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
                                            eval_image_embeds=False)
         conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
+
+        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
 
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
@@ -239,6 +245,19 @@ class RunnerSc(RunnerBase):
                 conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
                 unconditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet_uncond]
 
+        live_preview = self.app_config.get('LIVE_PREVIEW', None)
+        live_preview_save = self.app_config.get('LIVE_PREVIEW_SAVE', None)
+        live_preview = live_preview is not None and live_preview != ''
+        live_preview_save = live_preview_save is not None and live_preview_save != ''
+        preview_params = {
+            'previewer_model': models.previewer,
+            'task_id': task_id, 'task_dir': task_dir,
+            'start_ts': time.time(),
+            'total_steps_c': prior_num_inference_steps,
+            'total_steps_b': decoder_num_inference_steps,
+            'live_preview': live_preview,
+            'live_preview_save': live_preview_save}
+
         with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
             torch.manual_seed(seed)
 
@@ -246,13 +265,12 @@ class RunnerSc(RunnerBase):
                 models.generator, conditions, stage_c_latent_shape,
                 unconditions, device=self.device, **extras.sampling_configs,
             )
-            # st = 0
+
+            st = 0
             for (sampled_c, _, _) in tqdm(sampling_c, total=extras.sampling_configs['timesteps']):
                 sampled_c = sampled_c
-                # st += 1
-                # preview_c = models.previewer(sampled_c).float()
-                # pi = show_images(preview_c)
-                # pi.save(f'{task_type}_preview_{st}.png')
+                st += 1
+                self._prepare_preview(sampled=sampled_c, step=st, stage='c', **preview_params)
 
             conditions_b['effnet'] = sampled_c
             unconditions_b['effnet'] = torch.zeros_like(sampled_c)
@@ -261,21 +279,49 @@ class RunnerSc(RunnerBase):
                 models_b.generator, conditions_b, stage_b_latent_shape,
                 unconditions_b, device=self.device, **extras_b.sampling_configs
             )
+            st = 0
             for (sampled_b, _, _) in tqdm(sampling_b, total=extras_b.sampling_configs['timesteps']):
                 sampled_b = sampled_b
+                st += 1
+                self._prepare_preview(sampled=sampled_b, step=st, stage='b', **preview_params)
             sampled = models_b.stage_a.decode(sampled_b).float()
 
         images = to_pil_images(sampled)
 
-        result = self.build_results(task_type,
+        result = self.build_results(task_dir,
                                     images,
-                                    task_id,
-                                    sub_dir=sub_dir,
                                     file_name_part=f'{width}x{height}',
                                     return_images_format=return_images_format)
         if generated_seed:
             result['seed'] = seed
         return result
+
+    def _prepare_preview(self, previewer_model, sampled, start_ts: float,
+                         task_id: str, task_dir: str, stage: str, step: int,
+                         total_steps_c: int = 20,
+                         total_steps_b: int = 10,
+                         live_preview: bool = False,
+                         live_preview_save: bool = False):
+        if live_preview:
+            c2b = 2
+            tw = total_steps_c * c2b + total_steps_b
+            if stage == 'b':
+                cw = total_steps_c * c2b + step
+            else:  # c
+                cw = step * c2b
+            pexpect = int((cw / tw) * 100)
+            preview = previewer_model(sampled).float()
+            self.live_preview = {'task_id': task_id,
+                                 'preview_id': f'{stage}{step}',
+                                 'previews': preview,
+                                 'percent': pexpect
+                                 }
+            if live_preview_save:
+                ts = time.time()
+                elapse = int(ts - start_ts)
+                pil_imgs = to_pil_images(preview)
+                for pi, pimg in enumerate(pil_imgs):
+                    pimg.save(os.path.join(task_dir, f'preview_{elapse}_{pexpect}_{stage}{step}-{pi}.png'))
 
     def _txt2img(self, **params):
         return self._inference(**params)
@@ -288,3 +334,18 @@ class RunnerSc(RunnerBase):
 
     def _img_gen(self, **params):
         return self._inference(**params)
+
+    def get_live_preview(self, task_id, last_preview_id):
+        lp = self.live_preview
+        if lp is None or lp.get('task_id') != task_id or lp.get('preview_id') == last_preview_id:
+            return None
+        if lp.get('base64_previews') is not None:
+            return lp.get('base64_previews')
+        base64_previews = to_base64_images(lp.get('previews'))
+        lp['base64_previews'] = base64_previews
+        return {
+            'success': True,
+            'preview_id': lp.get('preview_id'),
+            'percent': lp.get('percent'),
+            'images': base64_previews,
+        }
