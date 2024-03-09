@@ -109,7 +109,7 @@ class RunnerSc(RunnerBase):
                    prior_guidance_scale: float = 4.0,
                    decoder_num_inference_steps: int = 10,
                    decoder_guidance_scale: float = 1.1,
-                   task_type='txt2img',  # img2img, img_variate, inpaint, outpaint
+                   task_type='txt2img',  # img2img, variation, inpaint, outpaint
                    return_images_format: str = 'base64',  # pil
                    sub_dir: str = None,
                    ):
@@ -149,7 +149,7 @@ class RunnerSc(RunnerBase):
 
         image0 = None
         padded_image = None
-        if task_type in ['img2img', 'img_variate', 'inpaint', 'outpaint']:
+        if task_type in ['img2img', 'variation', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             _, h, w = tensor_image.shape
             if task_type == 'outpaint' and min(h, w) > 1400:
@@ -223,7 +223,7 @@ class RunnerSc(RunnerBase):
         extras_b.sampling_configs['timesteps'] = decoder_num_inference_steps
         extras_b.sampling_configs['t_start'] = 1.0
 
-        eval_image_embeds = task_type in ['img_variate', 'outpaint'] or (
+        eval_image_embeds = task_type in ['variation', 'outpaint'] or (
                 image is not None and (prompt is None or prompt == ''))
         conditions = core.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
                                          eval_image_embeds=eval_image_embeds)
@@ -334,7 +334,7 @@ class RunnerSc(RunnerBase):
     def _img2img(self, **params):
         return self._inference(**params)
 
-    def _img_variate(self, **params):
+    def _variation(self, **params):
         return self._inference(**params)
 
     def _img_gen(self, **params):

@@ -130,9 +130,9 @@ def img2img():
     return _gen_images('img2img')
 
 
-@app.route('/task/img_variate', methods=('POST',))
-def img_variate():
-    return _gen_images('img_variate')
+@app.route('/task/variation', methods=('POST',))
+def variation():
+    return _gen_images('variation')
 
 
 @app.route('/task/img_gen', methods=('POST',))

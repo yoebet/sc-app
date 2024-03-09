@@ -75,9 +75,9 @@ Authorization: {{auth}}
 }
 
 
-### img_variate
+### variation
 
-POST {{base}}/task/img_variate
+POST {{base}}/task/variation
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
