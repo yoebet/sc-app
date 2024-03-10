@@ -282,8 +282,11 @@ class RunnerSc(RunnerBase):
                 models_b.generator, conditions_b, stage_b_latent_shape,
                 unconditions_b, device=self.device, **extras_b.sampling_configs
             )
+            st = 0
             for (sampled_b, _, _) in tqdm(sampling_b, total=extras_b.sampling_configs['timesteps']):
                 sampled_b = sampled_b
+                st += 1
+                self._prepare_preview(step=st, stage='b', **preview_params)
             sampled = models_b.stage_a.decode(sampled_b).float()
 
         images = to_pil_images(sampled)
@@ -296,8 +299,9 @@ class RunnerSc(RunnerBase):
             result['seed'] = seed
         return result
 
-    def _prepare_preview(self, previewer_model, sampled, start_ts: float,
+    def _prepare_preview(self, previewer_model, start_ts: float,
                          task_id: str, task_dir: str, stage: str, step: int,
+                         sampled=None,
                          total_steps_c: int = 20,
                          total_steps_b: int = 10,
                          enable_live_preview: bool = False,
@@ -312,20 +316,29 @@ class RunnerSc(RunnerBase):
             else:  # c
                 cw = step * c2b
             percent = int((cw / tw) * 100)
-            preview = previewer_model(sampled).float()
-            if self.live_preview is not None and self.live_preview.get('task_id') != task_id:
-                self.last_task_preview = self.live_preview
-            self.live_preview = {'task_id': task_id,
-                                 'preview_id': f'{stage}{step}',
-                                 'previews': preview,
-                                 'percent': percent
-                                 }
-            if live_preview_save:
-                ts = time.time()
-                elapse = int(ts - start_ts)
-                pil_imgs = to_pil_images(preview)
+            if percent == 100:
+                percent = 99
+
+            lp = {'task_id': task_id,
+                  'preview_id': f'{stage}{step}',
+                  'percent': percent
+                  }
+
+            if self.live_preview is not None:
+                if self.live_preview.get('task_id') == task_id:
+                    lp['previews'] = self.live_preview.get('previews')
+                else:
+                    self.last_task_preview = self.live_preview
+            self.live_preview = lp
+            if sampled is not None:
+                lp['previews'] = previewer_model(sampled).float()
+
+            previews = lp.get('previews')
+            if live_preview_save and previews is not None:
+                elapse = int(time.time() - start_ts)
+                pil_imgs = to_pil_images(previews)
                 for pi, pimg in enumerate(pil_imgs):
-                    pimg.save(os.path.join(task_dir, f'preview_t{elapse}_p{percent}_{stage}{step}-{pi}.png'))
+                    pimg.save(os.path.join(task_dir, f'preview_s{elapse}_p{percent}_{stage}{step}-{pi}.png'))
         except Exception as e:
             traceback.print_exc()
 
