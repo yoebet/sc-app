@@ -141,7 +141,7 @@ class DataCore(WarpCore):
         captions = batch.get('captions')
         neg_captions = batch.get('neg_captions', None)
         images = batch.get('images', None)
-        images_ori = batch.get('images_ori', None)
+        images_before_pad = batch.get('images_before_pad', None)
         batch_size = len(captions)
 
         text_embeddings = None
@@ -167,7 +167,7 @@ class DataCore(WarpCore):
         image_embeddings = None
         if 'clip_img' in return_fields:
             image_embeddings = torch.zeros(batch_size, 768, device=self.device)
-            images_for_emb = images_ori if images_ori is not None else images
+            images_for_emb = images_before_pad if images_before_pad is not None else images
             if images_for_emb is not None:
                 images_for_emb = images_for_emb.to(self.device)
                 if is_eval:

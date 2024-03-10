@@ -23,7 +23,6 @@ class RunnerSc(RunnerBase):
         self.extras_b = None
         self.models = None
         self.models_b = None
-        self.ip_models_loaded = False
         self.cn_core = None
         self.cn_models = None
         self.cn_extras = None
@@ -196,7 +195,7 @@ class RunnerSc(RunnerBase):
             images = image0.expand(batch_size, -1, -1, -1)
             batch['images'] = images.to(self.device)
             if padded_image is not None:
-                batch['images_ori'] = batch['images']
+                batch['images_before_pad'] = batch['images']
                 padded_images = padded_image.expand(batch_size, -1, -1, -1)
                 batch['images'] = padded_images.to(self.device)
 
