@@ -128,6 +128,8 @@ class RunnerSc(RunnerBase):
             generated_seed = True
             print("seed:", seed)
 
+        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
+
         if task_type in ['inpaint', 'outpaint']:
             self.ensure_ip_models()
             core = self.cn_core
@@ -148,16 +150,25 @@ class RunnerSc(RunnerBase):
 
         image0 = None
         padded_image = None
+
+        def resize_save_image(tensor, name):
+            _, h, w = tensor.shape
+            if w != 1024 and h != 1024:
+                tensor = F.resize(tensor, size=800, max_size=1280, antialias=True)
+            input_file_pil = F.to_pil_image(tensor.clamp(0, 1))
+            input_file_pil.save(os.path.join(task_dir, f'{name}.png'))
+            return tensor
+
         if task_type in ['img2img', 'variation', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             _, h, w = tensor_image.shape
-            # if task_type == 'outpaint' and min(h, w) > 1400:
-            if min(h, w) > 1200:
-                tensor_image = F.resize(tensor_image, 1200, antialias=True)
+            tensor_image = resize_save_image(tensor_image, 'input-image')
             image0 = tensor_image.to(self.device)
 
             if task_type in ['inpaint'] and mask is not None:
-                mask = prepare_image_tensor(mask).to(self.device)
+                mask = prepare_image_tensor(mask)
+                mask = resize_save_image(mask, 'input-mask')
+                mask.to(self.device)
 
         if task_type == 'outpaint':
             img_height = image0.size(1)
@@ -232,8 +243,6 @@ class RunnerSc(RunnerBase):
         conditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=False)
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
 
-        task_dir = self.get_task_dir(task_id, task_type, sub_dir)
-
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
             cnet_multiplier = 1.0  # 0.8, 0.3
@@ -307,6 +316,7 @@ class RunnerSc(RunnerBase):
                          live_preview_save: bool = False):
         if not enable_live_preview:
             return
+
         try:
             c2b = 2
             tw = total_steps_c * c2b + total_steps_b
@@ -337,7 +347,8 @@ class RunnerSc(RunnerBase):
                 elapse = int(time.time() - start_ts)
                 pil_imgs = to_pil_images(previews)
                 for pi, pimg in enumerate(pil_imgs):
-                    pimg.save(os.path.join(task_dir, f'preview_s{elapse}_p{percent}_{stage}{step}-{pi}.png'))
+                    pimg.save(
+                        os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}-{pi}.png'))
         except Exception as e:
             traceback.print_exc()
 
