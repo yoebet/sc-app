@@ -152,8 +152,9 @@ class RunnerSc(RunnerBase):
         if task_type in ['img2img', 'variation', 'inpaint', 'outpaint']:
             tensor_image = prepare_image_tensor(image)
             _, h, w = tensor_image.shape
-            if task_type == 'outpaint' and min(h, w) > 1400:
-                tensor_image = F.resize(tensor_image, 1400, antialias=True)
+            # if task_type == 'outpaint' and min(h, w) > 1400:
+            if min(h, w) > 1200:
+                tensor_image = F.resize(tensor_image, 1200, antialias=True)
             image0 = tensor_image.to(self.device)
 
             if task_type in ['inpaint'] and mask is not None:
