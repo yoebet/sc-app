@@ -8,7 +8,7 @@ import logging
 import random
 import yaml
 from tqdm import tqdm
-from inference.utils import to_pil_images, calculate_latent_sizes, to_base64_images
+from inference.utils import to_pil_images, calculate_latent_sizes, combine_images, pils_to_base64
 from train import WurstCoreC, WurstCoreB, ControlNetCore
 from .runner_base import RunnerBase, MAX_SEED
 from .common import prepare_image_tensor
@@ -349,10 +349,12 @@ class RunnerSc(RunnerBase):
             previews = lp.get('previews')
             if live_preview_save and previews is not None:
                 elapse = int(time.time() - start_ts)
-                pil_imgs = to_pil_images(previews)
-                for pi, pimg in enumerate(pil_imgs):
-                    pimg.save(
-                        os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}-{pi}.png'))
+                combined_pil = combine_images(previews)
+                combined_pil.save(os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}.png'))
+                # pil_imgs = to_pil_images(previews)
+                # for pi, pimg in enumerate(pil_imgs):
+                #     pimg.save(
+                #         os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}-{pi}.png'))
         except Exception as e:
             traceback.print_exc()
 
@@ -378,8 +380,12 @@ class RunnerSc(RunnerBase):
             return None
         if lp.get('base64_previews') is not None:
             return lp.get('base64_previews')
-        base64_previews = to_base64_images(lp.get('previews'))
-        lp['base64_previews'] = base64_previews
+        previews = lp.get('previews')  # tensors
+        base64_previews = []
+        if previews is not None:
+            combined_pil = combine_images(previews)
+            base64_previews = pils_to_base64([combined_pil])
+            lp['base64_previews'] = base64_previews
         return {
             'success': True,
             'preview_id': lp.get('preview_id'),

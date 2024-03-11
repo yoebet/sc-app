@@ -55,6 +55,33 @@ def show_images(images, rows=None, cols=None, return_images=True):
         return grid
 
 
+def combine_images(images, rows=None, cols=None):
+    batch_size = images.size(0)
+    if images.size(1) == 1:
+        images = images.repeat(1, 3, 1, 1)
+    elif images.size(1) > 3:
+        images = images[:, :3]
+
+    if batch_size == 1:
+        return F.to_pil_image(images[0].clamp(0, 1))
+
+    if rows is None:
+        rows = 1 if batch_size <= 2 else 2
+    if cols is None:
+        cols = images.size(0) // rows
+
+    _, _, h, w = images.shape
+    grid = PIL.Image.new('RGB', size=(cols * w, rows * h))
+
+    for i, img in enumerate(images):
+        img = F.to_pil_image(img.clamp(0, 1))
+        grid.paste(img, box=(i % cols * w, i // cols * h))
+
+    bio = BytesIO()
+    grid.save(bio, format='png')
+    return grid
+
+
 def to_pil_images(images):
     if images.size(1) == 1:
         images = images.repeat(1, 3, 1, 1)
