@@ -68,10 +68,16 @@ def combine_images(images, rows=None, cols=None):
     if rows is None:
         rows = 1 if batch_size <= 2 else 2
     if cols is None:
-        cols = images.size(0) // rows
+        cols = batch_size // rows
+        if batch_size % rows > 0:
+            cols += 1
+    left = cols - batch_size % rows
 
     _, _, h, w = images.shape
     grid = PIL.Image.new('RGB', size=(cols * w, rows * h))
+
+    if left > 0:
+        grid.paste((208, 208, 208), (0, 0, cols * w, rows * h))
 
     for i, img in enumerate(images):
         img = F.to_pil_image(img.clamp(0, 1))

@@ -349,7 +349,7 @@ class RunnerSc(RunnerBase):
             previews = lp.get('previews')
             if live_preview_save and previews is not None:
                 elapse = int(time.time() - start_ts)
-                combined_pil = combine_images(previews)
+                combined_pil = combine_images(previews, rows=1)
                 combined_pil.save(os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}.png'))
                 # pil_imgs = to_pil_images(previews)
                 # for pi, pimg in enumerate(pil_imgs):
@@ -383,7 +383,7 @@ class RunnerSc(RunnerBase):
         previews = lp.get('previews')  # tensors
         base64_previews = []
         if previews is not None:
-            combined_pil = combine_images(previews)
+            combined_pil = combine_images(previews, rows=1)
             base64_previews = pils_to_base64([combined_pil])
             lp['base64_previews'] = base64_previews
         return {
