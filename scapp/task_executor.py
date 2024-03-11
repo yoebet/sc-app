@@ -39,18 +39,6 @@ class TaskExecutor:
             runners[device_name] = runner
         return runner
 
-    def txt2img(self, task_params, launch_params):
-        runner = self.get_runner(launch_params)
-        return runner.txt2img(**task_params)
-
-    def img2img(self, task_params, launch_params):
-        runner = self.get_runner(launch_params)
-        return runner.img2img(**task_params)
-
-    def variation(self, task_params, launch_params):
-        runner = self.get_runner(launch_params)
-        return runner.variation(**task_params)
-
     def img_gen(self, task_params, launch_params):
         runner = self.get_runner(launch_params)
         return runner.img_gen(**task_params)

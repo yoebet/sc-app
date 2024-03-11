@@ -25,15 +25,6 @@ class RunnerBase:
     def load_models(self):
         ...
 
-    def _txt2img(self, **params):
-        ...
-
-    def _img2img(self, **params):
-        ...
-
-    def _img_variate(self, **params):
-        ...
-
     def _img_gen(self, **params):
         ...
 
@@ -112,15 +103,6 @@ class RunnerBase:
         task_id = params.get('task_id', '?')
         self.logger.info(f'task {task_id} finished.')
         return result
-
-    def txt2img(self, **params):
-        return self._run(self._txt2img, params=params)
-
-    def img2img(self, **params):
-        return self._run(self._img2img, params=params)
-
-    def img_variate(self, **params):
-        return self._run(self._img_variate, params=params)
 
     def img_gen(self, **params):
         return self._run(self._img_gen, params=params)

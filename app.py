@@ -120,21 +120,6 @@ def _gen_images(task_type=None):
     return jsonify(result)
 
 
-@app.route('/task/txt2img', methods=('POST',))
-def txt2img():
-    return _gen_images('txt2img')
-
-
-@app.route('/task/img2img', methods=('POST',))
-def img2img():
-    return _gen_images('img2img')
-
-
-@app.route('/task/variation', methods=('POST',))
-def variation():
-    return _gen_images('variation')
-
-
 @app.route('/task/img_gen', methods=('POST',))
 def img_gen():
     return _gen_images()

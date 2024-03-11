@@ -153,7 +153,7 @@ class RunnerSc(RunnerBase):
 
         def resize_save_image(tensor, name):
             _, h, w = tensor.shape
-            if w != 1024 and h != 1024:
+            if h * w > 1080 * 1080:
                 tensor = F.resize(tensor, size=800, max_size=1280, antialias=True)
             input_file_pil = F.to_pil_image(tensor.clamp(0, 1))
             input_file_pil.save(os.path.join(task_dir, f'{name}.png'))
@@ -335,7 +335,10 @@ class RunnerSc(RunnerBase):
 
             if self.live_preview is not None:
                 if self.live_preview.get('task_id') == task_id:
-                    lp['previews'] = self.live_preview.get('previews')
+                    elp = self.live_preview
+                    elp['preview_id'] = lp.get('preview_id')
+                    elp['percent'] = lp.get('percent')
+                    lp = elp
                 else:
                     self.last_task_preview = self.live_preview
             self.live_preview = lp

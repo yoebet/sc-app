@@ -22,13 +22,14 @@ Authorization: {{auth}}
 
 ### txt2img
 
-POST {{base}}/task/txt2img
+POST {{base}}/task/img_gen
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
 
 {
   "task": {
+    "task_type": "txt2img",
     "seed": 2796926360,
     "steps": 20,
     "width": 768,
@@ -48,13 +49,14 @@ Authorization: {{auth}}
 
 ### img2img
 
-POST {{base}}/task/img2img
+POST {{base}}/task/img_gen
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
 
 {
   "task": {
+    "task_type": "img2img",
     "task_id": "44",
     "sub_dir": "test",
     "image": "https://oss-prod.tishi.top/sd/t/SgNQaKyqnSHf2PVa/zDVycPK3VqCbvXJ3/1704119655_5.png",
@@ -77,13 +79,14 @@ Authorization: {{auth}}
 
 ### variation
 
-POST {{base}}/task/variation
+POST {{base}}/task/img_gen
 Content-Type: application/json
 Accept: application/json
 Authorization: {{auth}}
 
 {
   "task": {
+    "task_type": "variation",
     "image": "https://oss-dev.tishi.top/sds/hJXUclrhEfxarc6m/a36ryJ5UhCVuvVEM/1709093025-0.png",
     "prompt": "1girl, valley",
     "negative_prompt": "",
