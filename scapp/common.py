@@ -104,12 +104,14 @@ def decode_to_pil_images(encoded_images):
     return images
 
 
-def prepare_image_tensor(image):
+def prepare_image_tensor(image, mode='RGB'):
     if isinstance(image, str):
         if image.startswith('http'):
-            image = Image.open(requests.get(image, stream=True).raw).convert("RGB")
+            image = Image.open(requests.get(image, stream=True).raw)
         else:
             image = decode_to_pil_image(image)
+        if mode is not None:
+            image = image.convert(mode)
 
     return F.to_tensor(image)
 

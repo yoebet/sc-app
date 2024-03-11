@@ -166,8 +166,9 @@ class RunnerSc(RunnerBase):
             image0 = tensor_image.to(self.device)
 
             if task_type in ['inpaint'] and mask is not None:
-                mask = prepare_image_tensor(mask)
+                mask = prepare_image_tensor(mask, 'L')
                 mask = resize_save_image(mask, 'input-mask')
+                mask = mask.expand(batch_size, -1, -1, -1)
                 mask = mask.bool().to(self.device)
 
         if task_type == 'outpaint':
