@@ -383,7 +383,7 @@ class RunnerSc(RunnerBase):
         previews = lp.get('previews')  # tensors
         base64_previews = []
         if previews is not None:
-            combined_pil = combine_images(previews, rows=1)
+            combined_pil = combine_images(previews)
             base64_previews = pils_to_base64([combined_pil])
             lp['base64_previews'] = base64_previews
         return {
