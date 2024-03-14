@@ -152,9 +152,10 @@ class RunnerSc(RunnerBase):
         padded_image = None
 
         def resize_save_image(tensor, name):
+            msize = 1536 if task_type == 'outpaint' else 1280
             _, h, w = tensor.shape
-            if h * w > 1080 * 1080:
-                tensor = F.resize(tensor, size=800, max_size=1280, antialias=True)
+            if h * w > msize * msize:
+                tensor = F.resize(tensor, size=1024, max_size=msize, antialias=True)
             input_file_pil = F.to_pil_image(tensor.clamp(0, 1))
             input_file_pil.save(os.path.join(task_dir, f'{name}.png'))
             return tensor
