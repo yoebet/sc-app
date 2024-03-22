@@ -248,7 +248,7 @@ class RunnerSc(RunnerBase):
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
 
         if use_cnet:
-            outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
+            outpaint = task_type == 'outpaint' or (task_type == 'inpaint' and mask_invert)
             if outpaint and mask is not None:
                 mask = ~mask
             cnet_multiplier = 1.0  # 0.8, 0.3
