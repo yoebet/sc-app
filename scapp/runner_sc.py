@@ -249,6 +249,8 @@ class RunnerSc(RunnerBase):
 
         if use_cnet:
             outpaint = task_type == 'outpaint' or (type == 'inpaint' and mask_invert)
+            if outpaint and mask is not None:
+                mask = ~mask
             cnet_multiplier = 1.0  # 0.8, 0.3
             if auto_mask_threshold is None:
                 auto_mask_threshold = 0.2  # 0.0 ~ 0.4
@@ -360,15 +362,6 @@ class RunnerSc(RunnerBase):
                 #         os.path.join(task_dir, f'preview_s{elapse:02d}_p{percent:02d}_{stage}{step:02d}-{pi}.png'))
         except Exception as e:
             traceback.print_exc()
-
-    def _txt2img(self, **params):
-        return self._inference(**params)
-
-    def _img2img(self, **params):
-        return self._inference(**params)
-
-    def _variation(self, **params):
-        return self._inference(**params)
 
     def _img_gen(self, **params):
         return self._inference(**params)
