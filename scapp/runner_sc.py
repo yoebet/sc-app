@@ -177,7 +177,7 @@ class RunnerSc(RunnerBase):
             img_width = image0.size(2)
             if outpaint_ext is None:
                 outpaint_ext = [64]
-            elif type(outpaint_ext) == int:
+            elif type(outpaint_ext) in (int, float):
                 outpaint_ext = [outpaint_ext]
             if len(outpaint_ext) == 1:
                 outpaint_ext = outpaint_ext * 4
@@ -187,7 +187,7 @@ class RunnerSc(RunnerBase):
                 outpaint_ext = outpaint_ext + [outpaint_ext[1]]
             elif len(outpaint_ext) > 4:
                 outpaint_ext = outpaint_ext[0: 4]
-            ext_top, ext_right, ext_bottom, ext_left = outpaint_ext
+            ext_top, ext_right, ext_bottom, ext_left = [round(i) for i in outpaint_ext]
 
             full_height = img_height + ext_top + ext_bottom
             full_width = img_width + ext_left + ext_right
@@ -197,10 +197,12 @@ class RunnerSc(RunnerBase):
             mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
             mask.to(self.device)
 
-            paddings = (ext_left, ext_right, ext_top, ext_bottom)
-            padded_image = torch.nn.ReflectionPad2d(paddings)(image0)
-            # padded_image = torch.randn((3, full_height, full_width))
-            # padded_image[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
+            if max(ext_left, ext_right) > img_width or max(ext_top, ext_bottom) > img_height:
+                padded_image = torch.randn((3, full_height, full_width))
+                padded_image[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
+            else:
+                paddings = (ext_left, ext_right, ext_top, ext_bottom)
+                padded_image = torch.nn.ReflectionPad2d(paddings)(image0)
 
             height, width = full_height, full_width
 
