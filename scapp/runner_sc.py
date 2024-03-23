@@ -171,40 +171,47 @@ class RunnerSc(RunnerBase):
                 mask = resize_save_image(mask, 'input-mask')
                 mask = mask.expand(batch_size, -1, -1, -1)
                 mask = mask.bool().to(self.device)
+                if mask_invert:
+                    mask = ~mask
+                    mask_pil = F.to_pil_image(mask[0].clamp(0.0, 1.0))
+                    mask_pil.save(os.path.join(task_dir, f'inverted-mask.png'))
 
-        if task_type == 'outpaint':
-            img_height = image0.size(1)
-            img_width = image0.size(2)
-            if outpaint_ext is None:
-                outpaint_ext = [64]
-            elif type(outpaint_ext) in (int, float):
-                outpaint_ext = [outpaint_ext]
-            if len(outpaint_ext) == 1:
-                outpaint_ext = outpaint_ext * 4
-            elif len(outpaint_ext) == 2:
-                outpaint_ext = outpaint_ext * 2
-            elif len(outpaint_ext) == 3:
-                outpaint_ext = outpaint_ext + [outpaint_ext[1]]
-            elif len(outpaint_ext) > 4:
-                outpaint_ext = outpaint_ext[0: 4]
-            ext_top, ext_right, ext_bottom, ext_left = [round(i) for i in outpaint_ext]
+            if task_type == 'outpaint':
+                img_height = image0.size(1)
+                img_width = image0.size(2)
+                if outpaint_ext is None:
+                    outpaint_ext = [64]
+                elif type(outpaint_ext) in (int, float):
+                    outpaint_ext = [outpaint_ext]
+                if len(outpaint_ext) == 1:
+                    outpaint_ext = outpaint_ext * 4
+                elif len(outpaint_ext) == 2:
+                    outpaint_ext = outpaint_ext * 2
+                elif len(outpaint_ext) == 3:
+                    outpaint_ext = outpaint_ext + [outpaint_ext[1]]
+                elif len(outpaint_ext) > 4:
+                    outpaint_ext = outpaint_ext[0: 4]
+                ext_top, ext_right, ext_bottom, ext_left = [round(i) for i in outpaint_ext]
 
-            full_height = img_height + ext_top + ext_bottom
-            full_width = img_width + ext_left + ext_right
+                full_height = img_height + ext_top + ext_bottom
+                full_width = img_width + ext_left + ext_right
 
-            mask = torch.ones(batch_size, 1, full_height, full_width).bool()
-            mask_keep = torch.zeros(batch_size, 1, img_height, img_width).bool()
-            mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
-            mask.to(self.device)
+                mask = torch.ones(batch_size, 1, full_height, full_width).bool()
+                mask_keep = torch.zeros(batch_size, 1, img_height, img_width).bool()
+                mask[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = mask_keep
+                mask_pil = F.to_pil_image(mask[0].clamp(0.0, 1.0))
+                mask_pil.save(os.path.join(task_dir, f'outpaint-mask.png'))
+                mask.to(self.device)
 
-            if max(ext_left, ext_right) > img_width or max(ext_top, ext_bottom) > img_height:
                 padded_image = torch.randn((3, full_height, full_width))
                 padded_image[..., ext_top:ext_top + img_height, ext_left:ext_left + img_width] = image0
-            else:
-                paddings = (ext_left, ext_right, ext_top, ext_bottom)
-                padded_image = torch.nn.ReflectionPad2d(paddings)(image0)
+                # paddings = (ext_left, ext_right, ext_top, ext_bottom)
+                # padded_image = torch.nn.ReflectionPad2d(paddings)(image0)
+                padded_pil = F.to_pil_image(padded_image)
+                padded_pil.save(os.path.join(task_dir, f'padded_image.png'))
 
-            height, width = full_height, full_width
+                height, width = full_height, full_width
+            # outpaint
 
         if image0 is not None:
             images = image0.expand(batch_size, -1, -1, -1)
@@ -248,15 +255,12 @@ class RunnerSc(RunnerBase):
         unconditions_b = core_b.get_conditions(batch, models_b, extras_b, is_eval=True, is_unconditional=True)
 
         if use_cnet:
-            outpaint = task_type == 'outpaint' or (task_type == 'inpaint' and mask_invert)
-            if outpaint and mask is not None:
-                mask = ~mask
             cnet_multiplier = 1.0  # 0.8, 0.3
             if auto_mask_threshold is None:
                 auto_mask_threshold = 0.2  # 0.0 ~ 0.4
 
             with torch.no_grad(), torch.cuda.amp.autocast(dtype=torch.bfloat16):
-                cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask, outpaint=outpaint,
+                cnet, cnet_input = core.get_cnet(batch, models, extras, mask=mask,
                                                  threshold=auto_mask_threshold)
                 cnet_uncond = cnet
                 conditions['cnet'] = [c.clone() * cnet_multiplier if c is not None else c for c in cnet]
@@ -287,7 +291,8 @@ class RunnerSc(RunnerBase):
             for (sampled_c, _, _) in tqdm(sampling_c, total=extras.sampling_configs['timesteps']):
                 sampled_c = sampled_c
                 st += 1
-                self._prepare_preview(sampled=sampled_c, step=st, stage='c', **preview_params)
+                if task_type != 'outpaint' or st > prior_num_inference_steps / 4:
+                    self._prepare_preview(sampled=sampled_c, step=st, stage='c', **preview_params)
 
             conditions_b['effnet'] = sampled_c
             unconditions_b['effnet'] = torch.zeros_like(sampled_c)
